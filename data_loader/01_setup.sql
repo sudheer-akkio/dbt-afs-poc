@@ -12,6 +12,9 @@ USE SCHEMA DEMO.AFS_POC;
 -- Step 2: Create the external stage with your S3 credentials
 -- NOTE: Replace the placeholders below with your actual AWS credentials
 -- For security, use environment variables or Snowflake's credential management
+-- Metadata:
+--   - S3 Bucket Name: afs-akkio
+--   - Bucket Region: us-east-1
 CREATE OR REPLACE STAGE afs_s3_stage
   URL = 's3://afs-akkio/'
   CREDENTIALS = (
@@ -32,6 +35,18 @@ CREATE OR REPLACE FILE FORMAT gzip_csv_format
   FIELD_OPTIONALLY_ENCLOSED_BY = '"'
   SKIP_HEADER = 1
   FIELD_DELIMITER = ',';
+
+-- Gzip compressed TSV (tab-separated) format for brand_location and other tab-delimited files
+-- Data Format Rules:
+--   - Compression: GZIP
+--   - Field Delimiter: Tab (\t)
+--   - Column Header: No (SKIP_HEADER = 0 means no header row to skip)
+CREATE OR REPLACE FILE FORMAT gzip_tsv_format
+  TYPE = 'CSV'
+  COMPRESSION = 'GZIP'
+  FIELD_OPTIONALLY_ENCLOSED_BY = '"'
+  SKIP_HEADER = 0
+  FIELD_DELIMITER = '\t';
 
 -- Step 4: Verify access to the files
 LIST @afs_s3_stage/files_from_affinity/;

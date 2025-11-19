@@ -8,9 +8,8 @@
 
 USE SCHEMA DEMO.AFS_POC;
 
--- DEMOGRAPHICS TABLE (from individual_demographic_spine parquet files)
--- Field descriptions per data dictionary:
-CREATE OR REPLACE TABLE DEMO.AFS_POC.DEMOGRAPHICS (
+-- DEMO TRANSACTION TABLE
+CREATE OR REPLACE TABLE DEMO.AFS_POC.DEMOGRAPHICS_TRANSACTIONS (
   membccid VARCHAR COMMENT 'Identifier of card. Unique for each card.',
   income VARCHAR COMMENT 'Estimated income range of a living unit.',
   wealth INTEGER COMMENT 'Predicted household net worth.',
