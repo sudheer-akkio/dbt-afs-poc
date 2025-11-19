@@ -1,0 +1,37 @@
+.#*
+
+target/
+dbt_packages/
+logs/
+sandbox/
+
+# Virtual Environment
+venv/
+env/
+.env/
+.venv/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# macOS Icons (Icon with carriage return)
+Icon
+Icon?
+Icon
+**/Icon
+**/Icon?
+*.ico
+.ico
