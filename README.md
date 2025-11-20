@@ -113,7 +113,7 @@ dbt-afs-poc/
 ### Dimension Tables
 
 1. **Individual Attributes**
-   - `v_akkio_attributes_latest` - Individual attributes dimension with all demographic attributes from Experian. One row per individual with normalized demographic fields including gender, age, ethnicity, income, wealth, politics, education, and geographic attributes.
+   - `v_akkio_attributes_latest` - Individual attributes dimension with all demographic attributes from AFS spine. One row per individual with normalized demographic fields including gender, age, ethnicity, income, wealth, politics, education, and geographic attributes.
    - **Grain**: One row per individual (AKKIO_ID)
    - **Materialization**: Table (clustered by AKKIO_ID)
 
