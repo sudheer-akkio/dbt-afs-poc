@@ -38,26 +38,26 @@ SELECT
     MODE(areaid) AS areaid,
     
     -- Merchant Attributes (aggregated lists)
-    string_agg(DISTINCT merchant_description, ',') AS merchant_description_str_list,
-    string_agg(DISTINCT merchant_category_code, ',') AS merchant_category_code_str_list,
-    string_agg(DISTINCT merchant_city, ',') AS merchant_city_str_list,
-    string_agg(DISTINCT merchant_state, ',') AS merchant_state_str_list,
-    string_agg(DISTINCT merchant_zip, ',') AS merchant_zip_str_list,
-    string_agg(DISTINCT merchant_country, ',') AS merchant_country_str_list,
+    LISTAGG(DISTINCT merchant_description, ',') AS merchant_description_str_list,
+    LISTAGG(DISTINCT merchant_category_code, ',') AS merchant_category_code_str_list,
+    LISTAGG(DISTINCT merchant_city, ',') AS merchant_city_str_list,
+    LISTAGG(DISTINCT merchant_state, ',') AS merchant_state_str_list,
+    LISTAGG(DISTINCT merchant_zip, ',') AS merchant_zip_str_list,
+    LISTAGG(DISTINCT merchant_country, ',') AS merchant_country_str_list,
     
     -- Brand Attributes (aggregated lists)
-    string_agg(DISTINCT store_name, ',') AS store_name_str_list,
-    string_agg(DISTINCT brand_name, ',') AS brand_name_str_list,
-    string_agg(DISTINCT store_type, ',') AS store_type_str_list,
-    string_agg(DISTINCT brand_type, ',') AS brand_type_str_list,
-    string_agg(DISTINCT brand_tagging_classification, ',') AS brand_tagging_classification_str_list,
-    string_agg(DISTINCT transaction_channel, ',') AS transaction_channel_str_list,
+    LISTAGG(DISTINCT store_name, ',') AS store_name_str_list,
+    LISTAGG(DISTINCT brand_name, ',') AS brand_name_str_list,
+    LISTAGG(DISTINCT store_type, ',') AS store_type_str_list,
+    LISTAGG(DISTINCT brand_type, ',') AS brand_type_str_list,
+    LISTAGG(DISTINCT brand_tagging_classification, ',') AS brand_tagging_classification_str_list,
+    LISTAGG(DISTINCT transaction_channel, ',') AS transaction_channel_str_list,
     
     -- Store Location Attributes (aggregated lists)
-    string_agg(DISTINCT store_city, ',') AS store_city_str_list,
-    string_agg(DISTINCT store_state, ',') AS store_state_str_list,
-    string_agg(DISTINCT store_zip, ',') AS store_zip_str_list,
-    string_agg(DISTINCT store_country, ',') AS store_country_str_list,
+    LISTAGG(DISTINCT store_city, ',') AS store_city_str_list,
+    LISTAGG(DISTINCT store_state, ',') AS store_state_str_list,
+    LISTAGG(DISTINCT store_zip, ',') AS store_zip_str_list,
+    LISTAGG(DISTINCT store_country, ',') AS store_country_str_list,
     
     -- Unique Counts
     COUNT(DISTINCT mtid) AS unique_merchant_count,

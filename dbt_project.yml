@@ -41,6 +41,6 @@ models:
       columns: true
 
     afs:
-      +tags
+      +tags:
         - afs
       +database: DEMO
