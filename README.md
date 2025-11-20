@@ -83,6 +83,7 @@ dbt-afs-poc/
 │   ├── schema.yml           # Model documentation + generic tests
 │   ├── sources.yml          # Source table definitions
 │   ├── fact_transaction_enriched.sql
+│   ├── fact_transaction_summary.sql
 │   ├── v_akkio_attributes_latest.sql
 │   ├── v_agg_akkio_hh.sql
 │   └── v_agg_akkio_ind.sql
@@ -105,10 +106,15 @@ dbt-afs-poc/
 
 ### Fact Tables
 
-1. **Transaction Fact**
-   - `fact_transaction_enriched` - Enriched transaction fact table with AKKIO_ID for easy joining to attributes. Includes merchant, brand, and location attributes. Joins 6 source tables: TRANSACTION, CARD, MERCHANT, BRAND_TAGGING, BRAND_TAXONOMY, BRAND_LOCATION.
-   - **Grain**: One row per transaction (txid)
-   - **Materialization**: Table (clustered by trans_date, AKKIO_ID)
+1. **Transaction Facts**
+   - `fact_transaction_summary` - Daily transaction summary table aggregated by trans_date and AKKIO_ID. Optimized for RAG engine queries with transaction metrics, aggregated merchant/brand attributes, and unique counts. Preferred table for most analytics queries.
+     - **Grain**: One row per day per individual (trans_date, AKKIO_ID)
+     - **Materialization**: Table (clustered by trans_date, AKKIO_ID)
+     - **Source**: fact_transaction_enriched
+   
+   - `fact_transaction_enriched` - Detail transaction fact table with AKKIO_ID for easy joining to attributes. Includes merchant, brand, and location attributes. Use only when transaction-level detail is required; prefer fact_transaction_summary for most queries. Joins 6 source tables: TRANSACTION, CARD, MERCHANT, BRAND_TAGGING, BRAND_TAXONOMY, BRAND_LOCATION.
+     - **Grain**: One row per transaction (txid)
+     - **Materialization**: Incremental table (clustered by trans_date, AKKIO_ID)
 
 ### Dimension Tables
 

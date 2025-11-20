@@ -20,6 +20,7 @@ erDiagram
     
     %% dbt Model Relationships
     V_AKKIO_ATTRIBUTES_LATEST ||--o{ FACT_TRANSACTION_ENRICHED : "has"
+    FACT_TRANSACTION_ENRICHED ||--|| FACT_TRANSACTION_SUMMARY : "aggregates_to"
     V_AKKIO_ATTRIBUTES_LATEST ||--|| V_AGG_AKKIO_IND : "aggregates_to"
     V_AKKIO_ATTRIBUTES_LATEST ||--|| V_AGG_AKKIO_HH : "aggregates_to"
     
@@ -172,6 +173,43 @@ erDiagram
         string store_close_date
     }
     
+    FACT_TRANSACTION_SUMMARY {
+        date trans_date PK
+        string AKKIO_ID PK
+        int transaction_count
+        float total_transaction_amount
+        float avg_transaction_amount
+        float min_transaction_amount
+        float max_transaction_amount
+        string trans_time_zone
+        date latest_delivery_date
+        date earliest_delivery_date
+        string card_type
+        string card_zip
+        string areaid
+        string merchant_description_str_list
+        string merchant_category_code_str_list
+        string merchant_city_str_list
+        string merchant_state_str_list
+        string merchant_zip_str_list
+        string merchant_country_str_list
+        string store_name_str_list
+        string brand_name_str_list
+        string store_type_str_list
+        string brand_type_str_list
+        string brand_tagging_classification_str_list
+        string transaction_channel_str_list
+        string store_city_str_list
+        string store_state_str_list
+        string store_zip_str_list
+        string store_country_str_list
+        int unique_merchant_count
+        int unique_store_count
+        int unique_brand_count
+        int unique_mcc_count
+        int unique_channel_count
+    }
+    
     V_AGG_AKKIO_IND {
         string AKKIO_ID PK
         string AKKIO_HH_ID
@@ -246,6 +284,7 @@ erDiagram
 ### dbt Model Relationships
 
 - **V_AKKIO_ATTRIBUTES_LATEST** (1) ──────< (N) **FACT_TRANSACTION_ENRICHED**: One individual can have many transactions
+- **FACT_TRANSACTION_ENRICHED** (N) ──────> (1) **FACT_TRANSACTION_SUMMARY**: Many transaction detail rows aggregate to one daily summary row per individual
 - **V_AKKIO_ATTRIBUTES_LATEST** (1) ──────> (1) **V_AGG_AKKIO_IND**: One individual aggregates to one individual aggregation row
 - **V_AKKIO_ATTRIBUTES_LATEST** (1) ──────> (1) **V_AGG_AKKIO_HH**: One individual aggregates to one household aggregation row (currently 1:1, structured for future household scenarios)
 
@@ -255,13 +294,20 @@ erDiagram
 
 - **V_AKKIO_ATTRIBUTES_LATEST**: Individual Attributes Dimension - One row per individual with all normalized demographic attributes. Primary key is `AKKIO_ID` (formerly `afs_individual_id`). Contains 800+ demographic attributes with normalized values for gender, ethnicity, politics, income, wealth, etc. Generated from `INDIVIDUAL_DEMOGRAPHIC_SPINE` source table.
 
-- **FACT_TRANSACTION_ENRICHED**: Enriched Transaction Fact Table - Denormalized transaction table with `AKKIO_ID` for easy joining to attributes table. Built by joining 6 source tables:
+- **FACT_TRANSACTION_ENRICHED**: Detail Transaction Fact Table - Denormalized transaction table with `AKKIO_ID` for easy joining to attributes table. Contains granular detail about each individual transaction. Built by joining 6 source tables:
   - **TRANSACTION** (base table): Transaction facts (txid, trans_date, trans_time, trans_amount, etc.)
   - **CARD** (LEFT JOIN on `membccid`): Provides `AKKIO_ID` via `afs_individual_id`, plus card attributes
   - **MERCHANT** (LEFT JOIN on `mtid`): Provides merchant description, MCC, and location
   - **BRAND_TAGGING** (LEFT JOIN on `mtid`): Provides store_id, brand_id, channel, and locationid
   - **BRAND_TAXONOMY** (LEFT JOIN on `store_id` + `brand_id`): Provides store/brand names and classifications
   - **BRAND_LOCATION** (LEFT JOIN on `locationid`): Provides store address and location details
+  - **Materialization**: Incremental table (clustered by trans_date, AKKIO_ID)
+  - **Note**: Use `FACT_TRANSACTION_SUMMARY` for most queries unless transaction-level detail is required
+
+- **FACT_TRANSACTION_SUMMARY**: Daily Transaction Summary Table - Aggregated transaction activity per day and individual (`trans_date`, `AKKIO_ID`). Optimized for RAG engine queries that need summary-level data. Contains transaction metrics (count, totals, averages), aggregated merchant/brand attributes as comma-separated lists, and unique counts. Source: `FACT_TRANSACTION_ENRICHED`.
+  - **Grain**: One row per day per individual (trans_date, AKKIO_ID)
+  - **Materialization**: Table (clustered by trans_date, AKKIO_ID)
+  - **Use Case**: Preferred table for most analytics queries; use `FACT_TRANSACTION_ENRICHED` only when transaction-level detail is needed
 
 - **V_AGG_AKKIO_IND**: Individual Aggregation Table - One row per individual (`AKKIO_ID`) with aggregated demographic attributes optimized for analytics. Generated from `V_AKKIO_ATTRIBUTES_LATEST`. Includes weight field and contact identifier placeholders (MAIDS, IPS, EMAILS, PHONES).
 
@@ -269,7 +315,9 @@ erDiagram
 
 #### Design Principles
 
-- Both `V_AKKIO_ATTRIBUTES_LATEST` and `FACT_TRANSACTION_ENRICHED` use `AKKIO_ID` as the bridge for flexible querying
+- Both `V_AKKIO_ATTRIBUTES_LATEST` and transaction tables use `AKKIO_ID` as the bridge for flexible querying
 - Transactions are kept separate from individual attributes for optimal LLM query performance
+- `FACT_TRANSACTION_SUMMARY` provides aggregated daily summaries optimized for RAG queries; use `FACT_TRANSACTION_ENRICHED` only when transaction-level detail is required
 - All demographic fields are normalized (e.g., GENDER: MALE/FEMALE/UNKNOWN, ETHNICITY: HISPANIC/AFRICAN_AMERICAN/etc., POLITICS_NORMALIZED: DEMOCRAT_KNOWN/REPUBLICAN_INFERRED/etc.)
 - All joins in `FACT_TRANSACTION_ENRICHED` are LEFT JOINs to preserve all transactions even if enrichment data is missing
+- `FACT_TRANSACTION_ENRICHED` uses incremental materialization for efficient processing of new transactions

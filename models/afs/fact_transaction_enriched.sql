@@ -1,6 +1,6 @@
 {{ config(
     alias='FACT_TRANSACTION_ENRICHED',
-    materialized='table',
+    materialized='incremental',
     unique_key=['txid'],
     post_hook=[
         "alter table {{this}} cluster by (trans_date, AKKIO_ID)"
@@ -81,4 +81,25 @@ LEFT JOIN {{ source('afs_poc', 'BRAND_TAXONOMY') }} btax
 -- Join to Brand Location
 LEFT JOIN {{ source('afs_poc', 'BRAND_LOCATION') }} bl 
     ON bt.locationid = bl.locationid
+
+-- ============================================================================
+-- INCREMENTAL LOGIC: Process only new transactions
+-- Supports both incremental mode and batch processing via vars
+-- ============================================================================
+WHERE t.trans_date IS NOT NULL
+    {% if var('start_date', None) and var('end_date', None) %}
+        -- Batch processing mode: use --vars '{"start_date": "2024-01-01", "end_date": "2024-01-31"}'
+        AND t.trans_date BETWEEN '{{ var("start_date") }}' AND '{{ var("end_date") }}'
+    {% elif is_incremental() %}
+        -- Normal incremental mode: process only new data
+        AND t.trans_date > (SELECT MAX(trans_date) FROM {{ this }})
+    {% else %}
+        -- Full refresh: Last 6 months of data based on trans_date
+        AND t.trans_date >= DATEADD(month, -6, CURRENT_DATE())
+    {% endif %}
+
+-- To change the date range, modify the DATEADD function above:
+--   - For 12 months: Change -6 to -12
+--   - For 18 months: Change -6 to -18
+--   - For full data: Comment out or remove the WHERE clause entirely
 

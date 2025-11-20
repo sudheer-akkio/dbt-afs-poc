@@ -60,14 +60,17 @@ models:
       - name: ZIP_CODE
         description: "ZIP code"
       - name: CITY
-        description: "City name | :lower :space-to-hyphen |"
+        description: "City name | :lower :space-to-hyphen"
       - name: COUNTY_NAME
-        description: "County name | :lower :space-to-hyphen |"
+        description: "County name | :lower :space-to-hyphen"
   
   - name: fact_transaction_enriched
     description: >
-      Enriched Transaction Fact Table - Adds AKKIO_ID to transactions for easy joining to attributes table. Includes merchant, brand, and location attributes
-      | :short-name:fact_transaction_enriched: :use_for_audience_gen: |
+      Detail Transaction Fact Table - Adds AKKIO_ID to transactions for easy joining to attributes table. Includes merchant, brand, and location attributes.
+      This contains the same data as FACT_TRANSACTION_SUMMARY table with aggregated columns exploded into separate rows.
+      ONLY use this table when FACT_TRANSACTION_SUMMARY contains insufficient detail to answer the query.
+      This provides granular detail about each individual transaction.
+      | :short-name:transaction_detail: :use_for_audience_gen: |
       
     columns:
       - name: txid
@@ -79,12 +82,18 @@ models:
         description: "Unique identifier for an individual (Foreign Key to v_akkio_attributes_latest)"
       - name: trans_date
         description: "Transaction date"
+        data_tests:
+          - not_null
       - name: trans_time
         description: "Transaction time"
       - name: trans_time_zone
         description: "Transaction time zone"
       - name: trans_amount
         description: "Transaction amount"
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
       - name: transaction_delivery_date
         description: "Transaction delivery date"
       - name: membccid
@@ -98,46 +107,262 @@ models:
       - name: mtid
         description: "Merchant ID"
       - name: merchant_description
-        description: "Merchant description | :lower :space-to-hyphen |"
+        description: "Merchant description | :lower :space-to-hyphen"
       - name: merchant_category_code
         description: "Merchant category code (MCC)"
       - name: merchant_city
-        description: "Merchant city | :lower :space-to-hyphen |"
+        description: "Merchant city | :lower :space-to-hyphen"
       - name: merchant_state
-        description: "Merchant state | :upper |"
+        description: "Merchant state | :upper"
       - name: merchant_zip
         description: "Merchant zip code"
       - name: merchant_country
-        description: "Merchant country | :lower :space-to-hyphen |"
+        description: "Merchant country | :lower :space-to-hyphen"
       - name: store_id
         description: "Store ID"
       - name: brand_id
         description: "Brand ID"
       - name: transaction_channel
-        description: "Transaction channel (ONLINE or B&M) | :upper |"
+        description: "Transaction channel (ONLINE or B&M) | :upper"
       - name: locationid
         description: "Location ID"
       - name: store_name
-        description: "Store name | :lower :space-to-hyphen |"
+        description: "Store name | :lower :space-to-hyphen"
       - name: brand_name
-        description: "Brand name | :lower :space-to-hyphen |"
+        description: "Brand name | :lower :space-to-hyphen"
       - name: store_type
-        description: "Store type | :lower :space-to-hyphen |"
+        description: "Store type | :lower :space-to-hyphen"
       - name: brand_type
-        description: "Brand type | :lower :space-to-hyphen |"
+        description: "Brand type | :lower :space-to-hyphen"
       - name: brand_tagging_classification
-        description: "Brand tagging classification | :lower :space-to-hyphen |"
+        description: "Brand tagging classification | :lower :space-to-hyphen"
       - name: store_address
-        description: "Store address | :lower :space-to-hyphen |"
+        description: "Store address | :lower :space-to-hyphen"
       - name: store_city
-        description: "Store city | :lower :space-to-hyphen |"
+        description: "Store city | :lower :space-to-hyphen"
       - name: store_state
-        description: "Store state | :upper |"
+        description: "Store state | :upper"
       - name: store_zip
         description: "Store zip code"
       - name: store_country
-        description: "Store country | :lower :space-to-hyphen |"
+        description: "Store country | :lower :space-to-hyphen"
       - name: store_open_date
         description: "Estimated store open date"
       - name: store_close_date
         description: "Estimated store close date"
+  
+  - name: fact_transaction_summary
+    description: >
+      Transaction activity aggregated per given day.
+      TRY to use this table instead of FACT_TRANSACTION_ENRICHED, unless this table does not contain enough detail for the query.
+      | :short-name:transaction_activity: :use_for_audience_gen: |
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - trans_date
+            - AKKIO_ID
+    columns:
+      - name: trans_date
+        description: "Transaction date | :akkio-context-ignore"
+        data_tests:
+          - not_null
+      - name: AKKIO_ID
+        description: "Unique identifier for an individual (Foreign Key to v_akkio_attributes_latest)"
+        data_tests:
+          - not_null
+      - name: transaction_count
+        description: "Number of transactions for this individual on this date"
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+      - name: total_transaction_amount
+        description: "Sum of all transaction amounts for this individual on this date"
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+      - name: avg_transaction_amount
+        description: "Average transaction amount for this individual on this date"
+      - name: min_transaction_amount
+        description: "Minimum transaction amount for this individual on this date"
+      - name: max_transaction_amount
+        description: "Maximum transaction amount for this individual on this date"
+      - name: trans_time_zone
+        description: "Most common transaction time zone"
+      - name: latest_delivery_date
+        description: "Latest transaction delivery date"
+      - name: earliest_delivery_date
+        description: "Earliest transaction delivery date"
+      - name: card_type
+        description: "Most common card type"
+      - name: card_zip
+        description: "Most common card zip code"
+      - name: areaid
+        description: "Most common area ID"
+      - name: merchant_description_str_list
+        description: "Comma separated list of distinct merchant descriptions | :lower :space-to-hyphen :csv"
+      - name: merchant_category_code_str_list
+        description: "Comma separated list of distinct merchant category codes (MCC) | :csv"
+      - name: merchant_city_str_list
+        description: "Comma separated list of distinct merchant cities | :lower :space-to-hyphen :csv"
+      - name: merchant_state_str_list
+        description: "Comma separated list of distinct merchant states | :upper :csv"
+      - name: merchant_zip_str_list
+        description: "Comma separated list of distinct merchant zip codes | :csv"
+      - name: merchant_country_str_list
+        description: "Comma separated list of distinct merchant countries | :lower :space-to-hyphen :csv"
+      - name: store_name_str_list
+        description: "Comma separated list of distinct store names | :lower :space-to-hyphen :csv"
+      - name: brand_name_str_list
+        description: "Comma separated list of distinct brand names | :lower :space-to-hyphen :csv"
+      - name: store_type_str_list
+        description: "Comma separated list of distinct store types | :lower :space-to-hyphen :csv"
+      - name: brand_type_str_list
+        description: "Comma separated list of distinct brand types | :lower :space-to-hyphen :csv"
+      - name: brand_tagging_classification_str_list
+        description: "Comma separated list of distinct brand tagging classifications | :lower :space-to-hyphen :csv"
+      - name: transaction_channel_str_list
+        description: "Comma separated list of distinct transaction channels (ONLINE, B&M) | :upper :csv"
+      - name: store_city_str_list
+        description: "Comma separated list of distinct store cities | :lower :space-to-hyphen :csv"
+      - name: store_state_str_list
+        description: "Comma separated list of distinct store states | :upper :csv"
+      - name: store_zip_str_list
+        description: "Comma separated list of distinct store zip codes | :csv"
+      - name: store_country_str_list
+        description: "Comma separated list of distinct store countries | :lower :space-to-hyphen :csv"
+      - name: unique_merchant_count
+        description: "Count of distinct merchants"
+      - name: unique_store_count
+        description: "Count of distinct stores"
+      - name: unique_brand_count
+        description: "Count of distinct brands"
+      - name: unique_mcc_count
+        description: "Count of distinct merchant category codes"
+      - name: unique_channel_count
+        description: "Count of distinct transaction channels"
+  
+  - name: v_agg_akkio_hh
+    description: >
+      Household Aggregation Table - Household-level aggregation of demographic attributes for analytics.
+      Source: v_akkio_attributes_latest
+      Grain: One row per AKKIO_HH_ID (household)
+      Note: Since AKKIO_HH_ID = AKKIO_ID in the source, this is currently 1:1,
+      but structured for future scenarios where multiple individuals may share a household.
+      | :short-name:v_agg_akkio_hh: |
+    columns:
+      - name: AKKIO_HH_ID
+        description: "Household ID (Primary Key)"
+        data_tests:
+          - unique
+          - not_null
+      - name: HH_WEIGHT
+        description: "Household weight (fixed at 11 as proxy)"
+      - name: HOMEOWNER
+        description: "Homeowner status: HOMEOWNER, RENTER, or UNKNOWN"
+      - name: INCOME
+        description: "Household income in thousands (001-250, 000=Unknown)"
+      - name: INCOME_BUCKET
+        description: "Income range bucket: 1K_14K, 15K_24K, 25K_34K, 35K_49K, 50K_74K, 75K_99K, 100K_124K, 125K_149K, 150K_174K, 175K_199K, 200K_249K, 250K_PLUS, UNKNOWN, or UNDETERMINED | :akkio-ml-ignore |"
+      - name: WEALTH
+        description: "Wealth/net worth code (A-O)"
+      - name: WEALTH_BUCKET
+        description: "Wealth range bucket: 0_4999, 5000_14999, 15000_24999, 25000_49999, 50000_99999, 100000_199999, 200000_299999, 300000_399999, 400000_499999, 500000_599999, 600000_699999, 700000_799999, 800000_999999, 1000000_2499999, 2500000_PLUS, or UNKNOWN | :akkio-ml-ignore |"
+      - name: ADULTS_IN_HH
+        description: "Number of adults in household (0-8)"
+      - name: CHILDREN
+        description: "Number of children in household (0-8)"
+      - name: STATE_ABBR
+        description: "State abbreviation | :upper |"
+      - name: ZIP_CODE
+        description: "ZIP code"
+      - name: CITY
+        description: "City name | :lower :space-to-hyphen"
+      - name: COUNTY_NAME
+        description: "County name | :lower :space-to-hyphen"
+      - name: PARTITION_DATE
+        description: "Activity date (from lu_a_adat in YYYYMMDD format) or current date if not available | :akkio-context-ignore |"
+  
+  - name: v_agg_akkio_ind
+    description: >
+      Individual Aggregation Table - Individual-level aggregation of demographic attributes for analytics.
+      Source: v_akkio_attributes_latest
+      Grain: One row per AKKIO_ID (individual)
+      Note: Currently AKKIO_HH_ID = AKKIO_ID (1:1), but structured for future scenarios
+      where multiple individuals may share a household.
+      | :short-name:v_agg_akkio_ind: |
+    columns:
+      - name: AKKIO_ID
+        description: "Unique identifier for an individual (Primary Key)"
+        data_tests:
+          - unique
+          - not_null
+      - name: AKKIO_HH_ID
+        description: "Household ID (currently 1:1 with individual, structured for future household scenarios)"
+      - name: WEIGHT
+        description: "Individual weight (fixed at 11 per requirements)"
+      - name: GENDER
+        description: "Normalized gender: MALE, FEMALE, UNKNOWN, MALE_FEMALE_PAIR, or UNDETERMINED | :ml-encoding-nominal |"
+      - name: AGE
+        description: "Extracted age from combined_age_1 (E25 or I25 format)"
+      - name: AGE_BUCKET
+        description: "Age range bucket: 19-24, 25-29, 30-34, 35-39, 40-44, 45-49, 50-54, 55-59, 60+ | :akkio-ml-ignore |"
+      - name: ETHNICITY
+        description: "Normalized ethnicity: HISPANIC, AFRICAN_AMERICAN, SOUTHEAST_ASIAN, SOUTH_ASIAN, CENTRAL_ASIAN, MEDITERRANEAN, NATIVE_AMERICAN, SCANDINAVIAN, POLYNESIAN, MIDDLE_EASTERN, JEWISH, WESTERN_EUROPEAN, EASTERN_EUROPEAN, CARIBBEAN_NON_HISPANIC, EAST_ASIAN, UNCODED, or UNDETERMINED | :ml-encoding-nominal |"
+      - name: EDUCATION_LEVEL
+        description: "Education level code"
+      - name: MARITAL_STATUS
+        description: "Marital status code"
+      - name: HOMEOWNER
+        description: "Homeowner status: HOMEOWNER, RENTER, or UNKNOWN"
+      - name: INCOME
+        description: "Household income in thousands (001-250, 000=Unknown)"
+      - name: INCOME_BUCKET
+        description: "Income range bucket: 1K_14K, 15K_24K, 25K_34K, 35K_49K, 50K_74K, 75K_99K, 100K_124K, 125K_149K, 150K_174K, 175K_199K, 200K_249K, 250K_PLUS, UNKNOWN, or UNDETERMINED | :akkio-ml-ignore |"
+      - name: WEALTH
+        description: "Wealth/net worth code (A-O)"
+      - name: WEALTH_BUCKET
+        description: "Wealth range bucket: 0_4999, 5000_14999, 15000_24999, 25000_49999, 50000_99999, 100000_199999, 200000_299999, 300000_399999, 400000_499999, 500000_599999, 600000_699999, 700000_799999, 800000_999999, 1000000_2499999, 2500000_PLUS, or UNKNOWN | :akkio-ml-ignore |"
+      - name: POLITICS
+        description: "Political affiliation code (0U, 1D, 1I, 1R, 5D, 5I, 5N, 5R)"
+      - name: POLITICS_NORMALIZED
+        description: "Normalized political affiliation: DEMOCRAT_KNOWN, DEMOCRAT_INFERRED, REPUBLICAN_KNOWN, REPUBLICAN_INFERRED, INDEPENDENT_KNOWN, INDEPENDENT_INFERRED, NON_REGISTERED_INFERRED, UNKNOWN, or UNDETERMINED | :ml-encoding-nominal |"
+      - name: BUSINESS_OWNER
+        description: "Business owner code (Y=Yes, U=Unknown)"
+      - name: BUSINESS_OWNER_FLAG
+        description: "Business owner flag: YES, NO, or UNKNOWN"
+      - name: ADULTS_IN_HH
+        description: "Number of adults in household (0-8)"
+      - name: CHILDREN
+        description: "Number of children in household (0-8)"
+      - name: MAIDS
+        description: "Count of MAIDs (Mobile Advertising IDs) - placeholder for potential future enrichment"
+      - name: IPS
+        description: "Count of IPs - placeholder for potential future enrichment"
+      - name: EMAILS
+        description: "Count of emails - placeholder for potential future enrichment"
+      - name: PHONES
+        description: "Count of phone numbers - placeholder for potential future enrichment"
+      - name: STATE_ABBR
+        description: "State abbreviation | :upper |"
+      - name: ZIP_CODE
+        description: "ZIP code"
+      - name: CITY
+        description: "City name | :lower :space-to-hyphen"
+      - name: COUNTY_NAME
+        description: "County name | :lower :space-to-hyphen"
+      - name: CBSA_CODE
+        description: "5-digit CBSA code (Core Based Statistical Area, e.g., 10100=ABERDEEN SD, 16980=CHICAGO-NAPERVILLE-ELGIN IL-IN-WI)"
+      - name: CBSA_TYPE
+        description: "CBSA type: A=Metro CBSA, B=Micro CBSA, C=Not in CBSA"
+      - name: METRO_FLAG
+        description: "Metro area flag: Y=Metro Area, N=Not Metro Area, blank=Not a CBSA"
+      - name: MARKET_AREA_TYPE
+        description: "Market area type: METRO, MICRO, RURAL, or UNKNOWN"
+      - name: EDUCATION_MODEL
+        description: "Education model code"
+      - name: YEAR_OF_BIRTH
+        description: "Year of birth"
+      - name: PARTITION_DATE
+        description: "Activity date (from lu_a_adat in YYYYMMDD format) or current date if not available | :akkio-context-ignore |"
