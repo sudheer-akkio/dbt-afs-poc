@@ -33,6 +33,11 @@ flags:
 # files using the `{{ config(...) }}` macro.
 models:
   afs_poc_snowflake:
-    # Config indicated by + and applies to all files under models/example/
+    # Config indicated by + and applies to all files under models/afs/
     afs:
       +materialized: view
+      # Override materialization for fact and dimension tables
+      v_akkio_attributes_latest:
+        +materialized: table
+      fact_transaction_enriched:
+        +materialized: table

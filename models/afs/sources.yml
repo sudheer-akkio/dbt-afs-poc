@@ -1,0 +1,146 @@
+version: 2
+
+sources:
+  - name: afs_poc
+    description: "AFS POC source tables from DEMO.AFS_POC schema"
+    database: DEMO
+    schema: AFS_POC
+    tables:
+      - name: INDIVIDUAL_DEMOGRAPHIC_SPINE
+        description: "Individual demographic spine table containing one row per individual"
+        columns:
+          - name: afs_individual_id
+            description: "Unique identifier for an individual"
+          - name: membccid
+            description: "Member credit card ID"
+      
+      - name: TRANSACTION
+        description: "Transaction fact table"
+        columns:
+          - name: txid
+            description: "Transaction ID"
+          - name: trans_date
+            description: "Transaction date"
+          - name: trans_time
+            description: "Transaction time"
+          - name: trans_time_zone
+            description: "Transaction time zone"
+          - name: trans_amount
+            description: "Transaction amount"
+          - name: delivery_date
+            description: "Delivery date"
+          - name: membccid
+            description: "Member credit card ID"
+          - name: mtid
+            description: "Merchant ID"
+      
+      - name: CARD
+        description: "Card dimension table"
+        columns:
+          - name: membccid
+            description: "Member credit card ID"
+          - name: afs_individual_id
+            description: "Unique identifier for an individual"
+          - name: card_type
+            description: "Type of card"
+          - name: card_zip
+            description: "Card zip code"
+          - name: areaid
+            description: "Area ID"
+      
+      - name: MERCHANT
+        description: "Merchant dimension table"
+        columns:
+          - name: mtid
+            description: "Merchant ID"
+          - name: MERCH_DESC
+            description: "Merchant description"
+          - name: mcc
+            description: "Merchant category code"
+          - name: merch_city
+            description: "Merchant city"
+          - name: merch_state
+            description: "Merchant state"
+          - name: merch_zip
+            description: "Merchant zip code"
+          - name: merch_country
+            description: "Merchant country"
+      
+      - name: BRAND_TAGGING
+        description: "Brand tagging table linking transactions to brands"
+        columns:
+          - name: mtid
+            description: "Merchant ID"
+          - name: store_id
+            description: "Store ID"
+          - name: brand_id
+            description: "Brand ID"
+          - name: channel
+            description: "Transaction channel (ONLINE or B&M)"
+          - name: locationid
+            description: "Location ID"
+      
+      - name: BRAND_TAXONOMY
+        description: "Brand taxonomy table with brand classifications"
+        columns:
+          - name: store_id
+            description: "Store ID"
+          - name: brand_id
+            description: "Brand ID"
+          - name: store_name
+            description: "Store name"
+          - name: brand_name
+            description: "Brand name"
+          - name: store_type
+            description: "Store type"
+          - name: brand_type
+            description: "Brand type"
+          - name: brand_tagging_classification
+            description: "Brand tagging classification"
+      
+      - name: BRAND_LOCATION
+        description: "Brand location table with store location details"
+        columns:
+          - name: locationid
+            description: "Location ID"
+          - name: address
+            description: "Store address"
+          - name: city
+            description: "Store city"
+          - name: state
+            description: "Store state"
+          - name: zip
+            description: "Store zip code"
+          - name: country
+            description: "Store country"
+          - name: est_open_date
+            description: "Estimated store open date"
+          - name: est_close_date
+            description: "Estimated store close date"
+      
+      - name: DEMOGRAPHICS_TRANSACTIONS
+        description: "Demographics transactions table with card-level demographic attributes"
+        columns:
+          - name: membccid
+            description: "Member credit card ID"
+          - name: income
+            description: "Estimated income range"
+          - name: wealth
+            description: "Predicted household net worth"
+          - name: ethnicity
+            description: "Individual ethnicity"
+          - name: politics
+            description: "Individual political affiliation"
+          - name: ADULTS_IN_HH
+            description: "Number of adults in household"
+          - name: age
+            description: "Individual age group"
+          - name: business_owner
+            description: "Business owner flag"
+          - name: children
+            description: "Number of children in the living unit"
+          - name: homeowner_probability
+            description: "Homeowner or renter flag"
+          - name: gender
+            description: "Individual gender"
+

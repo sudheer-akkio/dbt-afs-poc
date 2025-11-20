@@ -2,20 +2,142 @@
 version: 2
 
 models:
-  - name: my_first_dbt_model
-    description: "A starter dbt model"
-    columns:
-      - name: id
-        description: "The primary key for this table"
-        data_tests:
-          - unique
-          - not_null
+  - name: v_akkio_attributes_latest
+    description: >
+      Individual Attributes Dimension - One row per individual with all demographic attributes
+      | :short-name:v_akkio_attributes_latest: :use_for_audience_gen: |
 
-  - name: my_second_dbt_model
-    description: "A starter dbt model"
     columns:
-      - name: id
-        description: "The primary key for this table"
+      - name: AKKIO_ID
+        description: "Unique identifier for an individual (Primary Key)"
         data_tests:
           - unique
           - not_null
+      - name: AKKIO_HH_ID
+        description: "Household ID (currently 1:1 with individual, structured for future household scenarios)"
+      - name: PARTITION_DATE
+        description: "Activity date (from lu_a_adat in YYYYMMDD format) or current date if not available | :akkio-context-ignore |"
+      - name: GENDER
+        description: "Normalized gender: MALE, FEMALE, UNKNOWN, MALE_FEMALE_PAIR, or UNDETERMINED | :ml-encoding-nominal |"
+      - name: AGE
+        description: "Extracted age from combined_age_1 (E25 or I25 format)"
+      - name: AGE_BUCKET
+        description: "Age range bucket: 19-24, 25-29, 30-34, 35-39, 40-44, 45-49, 50-54, 55-59, 60+ | :akkio-ml-ignore |"
+      - name: YEAR_OF_BIRTH
+        description: "Year of birth"
+      - name: ETHNICITY
+        description: "Normalized ethnicity: HISPANIC, AFRICAN_AMERICAN, SOUTHEAST_ASIAN, SOUTH_ASIAN, CENTRAL_ASIAN, MEDITERRANEAN, NATIVE_AMERICAN, SCANDINAVIAN, POLYNESIAN, MIDDLE_EASTERN, JEWISH, WESTERN_EUROPEAN, EASTERN_EUROPEAN, CARIBBEAN_NON_HISPANIC, EAST_ASIAN, UNCODED, or UNDETERMINED | :ml-encoding-nominal |"
+      - name: EDUCATION_LEVEL
+        description: "Education level code"
+      - name: EDUCATION_MODEL
+        description: "Education model code"
+      - name: MARITAL_STATUS
+        description: "Marital status code"
+      - name: HOMEOWNER_STATUS
+        description: "Homeowner status: HOMEOWNER, RENTER, or UNKNOWN"
+      - name: HOUSEHOLD_INCOME_K
+        description: "Household income in thousands (001-250, 000=Unknown)"
+      - name: INCOME_BUCKET
+        description: "Income range bucket: 1K_14K, 15K_24K, 25K_34K, 35K_49K, 50K_74K, 75K_99K, 100K_124K, 125K_149K, 150K_174K, 175K_199K, 200K_249K, 250K_PLUS, UNKNOWN, or UNDETERMINED | :akkio-ml-ignore |"
+      - name: WEALTH
+        description: "Wealth/net worth code (A-O)"
+      - name: WEALTH_BUCKET
+        description: "Wealth range bucket: 0_4999, 5000_14999, 15000_24999, 25000_49999, 50000_99999, 100000_199999, 200000_299999, 300000_399999, 400000_499999, 500000_599999, 600000_699999, 700000_799999, 800000_999999, 1000000_2499999, 2500000_PLUS, or UNKNOWN | :akkio-ml-ignore |"
+      - name: POLITICS
+        description: "Political affiliation code (0U, 1D, 1I, 1R, 5D, 5I, 5N, 5R)"
+      - name: POLITICS_NORMALIZED
+        description: "Normalized political affiliation: DEMOCRAT_KNOWN, DEMOCRAT_INFERRED, REPUBLICAN_KNOWN, REPUBLICAN_INFERRED, INDEPENDENT_KNOWN, INDEPENDENT_INFERRED, NON_REGISTERED_INFERRED, UNKNOWN, or UNDETERMINED | :ml-encoding-nominal |"
+      - name: BUSINESS_OWNER
+        description: "Business owner code (Y=Yes, U=Unknown)"
+      - name: BUSINESS_OWNER_FLAG
+        description: "Business owner flag: YES, NO, or UNKNOWN"
+      - name: ADULTS_IN_HH
+        description: "Number of adults in household (0-8)"
+      - name: CHILDREN
+        description: "Number of children in household (0-8)"
+      - name: STATE_ABBR
+        description: "State abbreviation | :upper |"
+      - name: ZIP_CODE
+        description: "ZIP code"
+      - name: CITY
+        description: "City name | :lower :space-to-hyphen |"
+      - name: COUNTY_NAME
+        description: "County name | :lower :space-to-hyphen |"
+  
+  - name: fact_transaction_enriched
+    description: >
+      Enriched Transaction Fact Table - Adds AKKIO_ID to transactions for easy joining to attributes table. Includes merchant, brand, and location attributes
+      | :short-name:fact_transaction_enriched: :use_for_audience_gen: |
+      
+    columns:
+      - name: txid
+        description: "Transaction ID (Primary Key)"
+        data_tests:
+          - unique
+          - not_null
+      - name: AKKIO_ID
+        description: "Unique identifier for an individual (Foreign Key to v_akkio_attributes_latest)"
+      - name: trans_date
+        description: "Transaction date"
+      - name: trans_time
+        description: "Transaction time"
+      - name: trans_time_zone
+        description: "Transaction time zone"
+      - name: trans_amount
+        description: "Transaction amount"
+      - name: transaction_delivery_date
+        description: "Transaction delivery date"
+      - name: membccid
+        description: "Member credit card ID"
+      - name: card_type
+        description: "Type of card"
+      - name: card_zip
+        description: "Card zip code"
+      - name: areaid
+        description: "Area ID"
+      - name: mtid
+        description: "Merchant ID"
+      - name: merchant_description
+        description: "Merchant description | :lower :space-to-hyphen |"
+      - name: merchant_category_code
+        description: "Merchant category code (MCC)"
+      - name: merchant_city
+        description: "Merchant city | :lower :space-to-hyphen |"
+      - name: merchant_state
+        description: "Merchant state | :upper |"
+      - name: merchant_zip
+        description: "Merchant zip code"
+      - name: merchant_country
+        description: "Merchant country | :lower :space-to-hyphen |"
+      - name: store_id
+        description: "Store ID"
+      - name: brand_id
+        description: "Brand ID"
+      - name: transaction_channel
+        description: "Transaction channel (ONLINE or B&M) | :upper |"
+      - name: locationid
+        description: "Location ID"
+      - name: store_name
+        description: "Store name | :lower :space-to-hyphen |"
+      - name: brand_name
+        description: "Brand name | :lower :space-to-hyphen |"
+      - name: store_type
+        description: "Store type | :lower :space-to-hyphen |"
+      - name: brand_type
+        description: "Brand type | :lower :space-to-hyphen |"
+      - name: brand_tagging_classification
+        description: "Brand tagging classification | :lower :space-to-hyphen |"
+      - name: store_address
+        description: "Store address | :lower :space-to-hyphen |"
+      - name: store_city
+        description: "Store city | :lower :space-to-hyphen |"
+      - name: store_state
+        description: "Store state | :upper |"
+      - name: store_zip
+        description: "Store zip code"
+      - name: store_country
+        description: "Store country | :lower :space-to-hyphen |"
+      - name: store_open_date
+        description: "Estimated store open date"
+      - name: store_close_date
+        description: "Estimated store close date"
