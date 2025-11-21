@@ -10,70 +10,175 @@
     
     Purpose: Individual-level aggregation of demographic attributes for analytics.
     Source: v_akkio_attributes_latest
-    Grain: One row per AKKIO_ID (individual)
+    Grain: One row per AKKIO_ID (individual) per PARTITION_DATE
     
     Note: Currently AKKIO_HH_ID = AKKIO_ID (1:1), but structured for future scenarios
     where multiple individuals may share a household.
 */
+
+WITH individual_data AS (
+    SELECT
+        attr.*,
+        media.APP_SERVICES_USED AS MEDIA_USED_APPS,
+        media.NETWORKS_WATCHED AS MEDIA_NETWORK_WATCHED,
+        media.TITLES_WATCHED AS MEDIA_TITLES_WATCHED,
+        media.GENRES_WATCHED AS MEDIA_GENRES_WATCHED,
+        media.INPUT_DEVICES_USED AS MEDIA_INPUT_DEVICES
+    FROM {{ ref('v_akkio_attributes_latest') }} attr
+    LEFT JOIN {{ ref('v_agg_akkio_ind_media') }} media
+        ON attr.AKKIO_ID = media.AKKIO_ID
+        AND attr.PARTITION_DATE = media.PARTITION_DATE
+)
 
 SELECT
     -- Primary Keys
     attr.AKKIO_ID,
     attr.AKKIO_HH_ID,
     
-    -- Weight (fixed at 11 per requirements)
-    11 AS WEIGHT,
-    
-    -- Demographics (convert NULL to 'UNDETERMINED' to match Horizon schema for insights compatibility)
-    COALESCE(attr.GENDER, 'UNDETERMINED') AS GENDER,
-    attr.AGE,
-    attr.AGE_BUCKET,
-    attr.ETHNICITY,
-    attr.EDUCATION_LEVEL,
-    attr.MARITAL_STATUS,
-    
-    -- Household-level attributes (needed for audience queries - same as Horizon's V_AGG_BLU_IND)
-    attr.HOMEOWNER_STATUS AS HOMEOWNER,
-    attr.HOUSEHOLD_INCOME_K AS INCOME,
-    attr.INCOME_BUCKET,
-    attr.WEALTH,
-    attr.WEALTH_BUCKET,
-    
-    -- Political and Business Attributes
-    attr.POLITICS,
-    attr.POLITICS_NORMALIZED,
-    attr.BUSINESS_OWNER,
-    attr.BUSINESS_OWNER_FLAG,
-    
-    -- Household Composition
-    attr.ADULTS_IN_HH,
-    attr.CHILDREN,
-    
-    -- Contact identifiers (counts, not arrays, for insights compatibility)
-    -- Placeholders for potential future enrichment from additional data sources
-    0 AS MAIDS,
-    0 AS IPS,
-    0 AS EMAILS,
-    0 AS PHONES,
-    
-    -- Geographic attributes
-    attr.STATE_ABBR,
+    -- Demographics
+    CASE 
+        WHEN attr.GENDER = 'MALE' THEN 'M'
+        WHEN attr.GENDER = 'FEMALE' THEN 'F'
+        ELSE NULL
+    END AS GENDER,
     attr.ZIP_CODE,
-    attr.CITY,
-    attr.COUNTY_NAME,
+    attr.AGE,
     
-    -- Market Area (CBSA - Core Based Statistical Area)
-    attr.CBSA_CODE,
-    attr.CBSA_TYPE,
-    attr.METRO_FLAG,
-    attr.MARKET_AREA_TYPE,
+    -- Age Bucket: Convert to integer codes (1-7) for insights
+    -- 1: 18-24, 2: 25-34, 3: 35-44, 4: 45-54, 5: 55-64, 6: 65-74, 7: 75+
+    CASE 
+        WHEN attr.AGE_BUCKET = '19-24' THEN 1
+        WHEN attr.AGE_BUCKET IN ('25-29', '30-34') THEN 2
+        WHEN attr.AGE_BUCKET IN ('35-39', '40-44') THEN 3
+        WHEN attr.AGE_BUCKET IN ('45-49', '50-54') THEN 4
+        WHEN attr.AGE_BUCKET = '55-59' THEN 5
+        WHEN attr.AGE_BUCKET = '60+' AND attr.AGE IS NOT NULL THEN
+            CASE 
+                WHEN attr.AGE BETWEEN 60 AND 74 THEN 6
+                WHEN attr.AGE >= 75 THEN 7
+                ELSE 6
+            END
+        WHEN attr.AGE_BUCKET = '60+' THEN 6
+        ELSE NULL
+    END AS AGE_BUCKET,
     
-    -- Additional core demographics (original fields available if needed: et_grp_1, et_code_1, educ_model_1, yearofbirth_1)
-    attr.EDUCATION_MODEL,
-    attr.YEAR_OF_BIRTH,
+    -- Age Bucket Detailed: More granular age buckets (1-12)
+    -- 1: 19-24, 2: 25-29, 3: 30-34, 4: 35-39, 5: 40-44, 6: 45-49, 7: 50-54, 8: 55-59, 9: 60-64, 10: 65-69, 11: 70-74, 12: 75+
+    CASE 
+        WHEN attr.AGE_BUCKET = '19-24' THEN 1
+        WHEN attr.AGE_BUCKET = '25-29' THEN 2
+        WHEN attr.AGE_BUCKET = '30-34' THEN 3
+        WHEN attr.AGE_BUCKET = '35-39' THEN 4
+        WHEN attr.AGE_BUCKET = '40-44' THEN 5
+        WHEN attr.AGE_BUCKET = '45-49' THEN 6
+        WHEN attr.AGE_BUCKET = '50-54' THEN 7
+        WHEN attr.AGE_BUCKET = '55-59' THEN 8
+        WHEN attr.AGE_BUCKET = '60+' AND attr.AGE IS NOT NULL THEN
+            CASE 
+                WHEN attr.AGE BETWEEN 60 AND 64 THEN 9
+                WHEN attr.AGE BETWEEN 65 AND 69 THEN 10
+                WHEN attr.AGE BETWEEN 70 AND 74 THEN 11
+                WHEN attr.AGE >= 75 THEN 12
+                ELSE 9
+            END
+        WHEN attr.AGE_BUCKET = '60+' THEN 9
+        ELSE NULL
+    END AS AGE_BUCKET_DETAILED,
     
-    -- Temporal
-    attr.PARTITION_DATE
+    attr.ETHNICITY AS ETHNICITY_PREDICTION,
+    attr.EDUCATION_LEVEL AS EDUCATION,
+    attr.MARITAL_STATUS,
+    attr.STATE_ABBR AS STATE,
+    attr.OCCUPATION,
+    
+    -- Contact identifiers (placeholders for future enrichment)
+    0 AS EMAILS,
+    0 AS MAIDS,
+    0 AS PHONES,
+    0 AS IPS,
+    
+    -- Interests as OBJECT
+    OBJECT_CONSTRUCT(
+        CASE WHEN attr.GENERAL_INTERESTS_ARTS_CRAFTS IS NOT NULL AND attr.GENERAL_INTERESTS_ARTS_CRAFTS != '' THEN 'arts_and_crafts' END, 1,
+        CASE WHEN attr.GENERAL_INTERESTS_BOOK_READER IS NOT NULL AND attr.GENERAL_INTERESTS_BOOK_READER != '' THEN 'book_reader' END, 1,
+        CASE WHEN attr.GENERAL_INTERESTS_CULTURAL_ARTS IS NOT NULL AND attr.GENERAL_INTERESTS_CULTURAL_ARTS != '' THEN 'cultural_arts' END, 1,
+        CASE WHEN attr.GENERAL_INTERESTS_DIY IS NOT NULL AND attr.GENERAL_INTERESTS_DIY != '' THEN 'do_it_yourselfers' END, 1,
+        CASE WHEN attr.GENERAL_INTERESTS_GOURMET_COOKING IS NOT NULL AND attr.GENERAL_INTERESTS_GOURMET_COOKING != '' THEN 'gourmet_cooking' END, 1,
+        CASE WHEN attr.GENERAL_INTERESTS_HOME_IMPROVEMENT IS NOT NULL AND attr.GENERAL_INTERESTS_HOME_IMPROVEMENT != '' THEN 'home_improvement' END, 1,
+        CASE WHEN attr.GENERAL_INTERESTS_PHOTOGRAPHY IS NOT NULL AND attr.GENERAL_INTERESTS_PHOTOGRAPHY != '' THEN 'photography' END, 1,
+        CASE WHEN attr.GENERAL_INTERESTS_SCRAPBOOKING IS NOT NULL AND attr.GENERAL_INTERESTS_SCRAPBOOKING != '' THEN 'scrapbooking' END, 1
+    ) AS GENERAL_INTERESTS,
+    
+    OBJECT_CONSTRUCT(
+        CASE WHEN attr.SPORTS_INTERESTS_RUNNING IS NOT NULL AND attr.SPORTS_INTERESTS_RUNNING != '' THEN 'avid_runners' END, 1,
+        CASE WHEN attr.SPORTS_INTERESTS_FITNESS IS NOT NULL AND attr.SPORTS_INTERESTS_FITNESS != '' THEN 'fitness_enthusiast' END, 1,
+        CASE WHEN attr.SPORTS_INTERESTS_HUNTING IS NOT NULL AND attr.SPORTS_INTERESTS_HUNTING != '' THEN 'hunting_enthusiasts' END, 1,
+        CASE WHEN attr.SPORTS_INTERESTS_NASCAR IS NOT NULL AND attr.SPORTS_INTERESTS_NASCAR != '' THEN 'nascar_enthusiast' END, 1,
+        CASE WHEN attr.SPORTS_INTERESTS_MLB IS NOT NULL AND attr.SPORTS_INTERESTS_MLB != '' THEN 'mlb_enthusiast' END, 1,
+        CASE WHEN attr.SPORTS_INTERESTS_NBA IS NOT NULL AND attr.SPORTS_INTERESTS_NBA != '' THEN 'nba_enthusiast' END, 1,
+        CASE WHEN attr.SPORTS_INTERESTS_NFL IS NOT NULL AND attr.SPORTS_INTERESTS_NFL != '' THEN 'nfl_enthusiast' END, 1,
+        CASE WHEN attr.SPORTS_INTERESTS_NHL IS NOT NULL AND attr.SPORTS_INTERESTS_NHL != '' THEN 'nhl_enthusiast' END, 1,
+        CASE WHEN attr.SPORTS_INTERESTS_OUTDOOR IS NOT NULL AND attr.SPORTS_INTERESTS_OUTDOOR != '' THEN 'outdoor_enthusiast' END, 1,
+        CASE WHEN attr.SPORTS_INTERESTS_PGA IS NOT NULL AND attr.SPORTS_INTERESTS_PGA != '' THEN 'pga_tour_enthusiast' END, 1,
+        CASE WHEN attr.SPORTS_INTERESTS_GOLF IS NOT NULL AND attr.SPORTS_INTERESTS_GOLF != '' THEN 'play_golf' END, 1,
+        CASE WHEN attr.SPORTS_INTERESTS_HOCKEY IS NOT NULL AND attr.SPORTS_INTERESTS_HOCKEY != '' THEN 'plays_hockey' END, 1,
+        CASE WHEN attr.SPORTS_INTERESTS_SOCCER IS NOT NULL AND attr.SPORTS_INTERESTS_SOCCER != '' THEN 'plays_soccer' END, 1,
+        CASE WHEN attr.SPORTS_INTERESTS_TENNIS IS NOT NULL AND attr.SPORTS_INTERESTS_TENNIS != '' THEN 'plays_tennis' END, 1,
+        CASE WHEN attr.SPORTS_INTERESTS_SNOW IS NOT NULL AND attr.SPORTS_INTERESTS_SNOW != '' THEN 'snow_sports' END, 1,
+        CASE WHEN attr.SPORTS_INTERESTS_GENERAL IS NOT NULL AND attr.SPORTS_INTERESTS_GENERAL != '' THEN 'sports_enthusiast' END, 1
+    ) AS SPORTS_INTERESTS,
+    
+    OBJECT_CONSTRUCT(
+        CASE WHEN attr.READING_INTERESTS_AUDIO_BOOKS IS NOT NULL AND attr.READING_INTERESTS_AUDIO_BOOKS != '' THEN 'audio_book_listener' END, 1,
+        CASE WHEN attr.READING_INTERESTS_BOOKS IS NOT NULL AND attr.READING_INTERESTS_BOOKS != '' THEN 'book_reader' END, 1,
+        CASE WHEN attr.READING_INTERESTS_DIGITAL_MAGAZINES IS NOT NULL AND attr.READING_INTERESTS_DIGITAL_MAGAZINES != '' THEN 'digital_magazine_newspapers_buyers' END, 1,
+        CASE WHEN attr.READING_INTERESTS_EBOOKS IS NOT NULL AND attr.READING_INTERESTS_EBOOKS != '' THEN 'e_book_reader' END, 1
+    ) AS READING_INTERESTS,
+    
+    OBJECT_CONSTRUCT(
+        CASE WHEN attr.TRAVEL_INTERESTS_AMUSEMENT_PARKS IS NOT NULL AND attr.TRAVEL_INTERESTS_AMUSEMENT_PARKS != '' THEN 'amusement_park_visitors' END, 1,
+        CASE WHEN attr.TRAVEL_INTERESTS_BOATING IS NOT NULL AND attr.TRAVEL_INTERESTS_BOATING != '' THEN 'boating' END, 1,
+        CASE WHEN attr.TRAVEL_INTERESTS_CANOEING IS NOT NULL AND attr.TRAVEL_INTERESTS_CANOEING != '' THEN 'canoeing_kayaking' END, 1,
+        CASE WHEN attr.TRAVEL_INTERESTS_DISNEY IS NOT NULL AND attr.TRAVEL_INTERESTS_DISNEY != '' THEN 'disney' END, 1,
+        CASE WHEN attr.TRAVEL_INTERESTS_FISHING IS NOT NULL AND attr.TRAVEL_INTERESTS_FISHING != '' THEN 'fishing' END, 1,
+        CASE WHEN attr.TRAVEL_INTERESTS_HEAVY_TRAVEL IS NOT NULL AND attr.TRAVEL_INTERESTS_HEAVY_TRAVEL != '' THEN 'heavy_travel' END, 1,
+        CASE WHEN attr.TRAVEL_INTERESTS_TRAVEL_REWARDS IS NOT NULL AND attr.TRAVEL_INTERESTS_TRAVEL_REWARDS != '' THEN 'travel_reward' END, 1,
+        CASE WHEN attr.TRAVEL_INTERESTS_ZOO IS NOT NULL AND attr.TRAVEL_INTERESTS_ZOO != '' THEN 'zoo_visitors' END, 1
+    ) AS TRAVEL_INTERESTS,
+    
+    -- Financial Health Bucket: Convert to numeric (1=LOW, 2=MEDIUM, 3=HIGH)
+    CASE 
+        WHEN attr.FINANCIAL_HEALTH_BUCKET = 'LOW' THEN 1
+        WHEN attr.FINANCIAL_HEALTH_BUCKET = 'MEDIUM' THEN 2
+        WHEN attr.FINANCIAL_HEALTH_BUCKET = 'HIGH' THEN 3
+        ELSE NULL
+    END AS FINANCIAL_HEALTH_BUCKET,
+    
+    attr.NET_WORTH_BUCKET,
+    
+    -- Credit Card Info as OBJECT
+    OBJECT_CONSTRUCT(
+        CASE WHEN attr.CREDIT_CARD_INFO_CREDIT_CARD_USER IS NOT NULL AND attr.CREDIT_CARD_INFO_CREDIT_CARD_USER != '' THEN 'credit_card_user' END, 1,
+        CASE WHEN attr.CREDIT_CARD_INFO_MAJOR_CC_USER IS NOT NULL AND attr.CREDIT_CARD_INFO_MAJOR_CC_USER != '' THEN 'major_credit_card_user' END, 1,
+        CASE WHEN attr.CREDIT_CARD_INFO_PREMIUM_CC_USER IS NOT NULL AND attr.CREDIT_CARD_INFO_PREMIUM_CC_USER != '' THEN 'premium_credit_card_user' END, 1,
+        CASE WHEN attr.CREDIT_CARD_INFO_STORE_CC_USER IS NOT NULL AND attr.CREDIT_CARD_INFO_STORE_CC_USER != '' THEN 'store_credit_card_user' END, 1,
+        CASE WHEN attr.CREDIT_CARD_INFO_AMEX_USER IS NOT NULL AND attr.CREDIT_CARD_INFO_AMEX_USER != '' THEN 'amex_card_user' END, 1,
+        CASE WHEN attr.CREDIT_CARD_INFO_DISCOVER_USER IS NOT NULL AND attr.CREDIT_CARD_INFO_DISCOVER_USER != '' THEN 'discover_user' END, 1,
+        CASE WHEN attr.CREDIT_CARD_INFO_MASTERCARD_USER IS NOT NULL AND attr.CREDIT_CARD_INFO_MASTERCARD_USER != '' THEN 'mastercard_user' END, 1,
+        CASE WHEN attr.CREDIT_CARD_INFO_VISA_SIGNATURE IS NOT NULL AND attr.CREDIT_CARD_INFO_VISA_SIGNATURE != '' THEN 'visa_signature' END, 1
+    ) AS CREDIT_CARD_INFO,
+    
+    -- Investment Type (using the first available investment type)
+    CASE 
+        WHEN attr.INVESTMENT_TYPE_ACTIVE_INVESTOR IS NOT NULL AND attr.INVESTMENT_TYPE_ACTIVE_INVESTOR != '' THEN 'ACTIVE_INVESTOR'
+        WHEN attr.INVESTMENT_TYPE_BROKERAGE_ACCOUNT IS NOT NULL AND attr.INVESTMENT_TYPE_BROKERAGE_ACCOUNT != '' THEN 'BROKERAGE_ACCOUNT_OWNER'
+        WHEN attr.INVESTMENT_TYPE_RETIREMENT_PLAN IS NOT NULL AND attr.INVESTMENT_TYPE_RETIREMENT_PLAN != '' THEN 'RETIREMENT_FINANCIAL_PLAN'
+        WHEN attr.INVESTMENT_TYPE_MUTUAL_FUND IS NOT NULL AND attr.INVESTMENT_TYPE_MUTUAL_FUND != '' THEN 'MUTUAL_FUND_INVESTOR'
+        WHEN attr.INVESTMENT_TYPE_ONLINE_TRADING IS NOT NULL AND attr.INVESTMENT_TYPE_ONLINE_TRADING != '' THEN 'ONLINE_TRADING'
+        ELSE NULL
+    END AS INVESTMENT_TYPE,
 
-FROM {{ ref('v_akkio_attributes_latest') }} attr
-
+    -- Partition Date
+    attr.PARTITION_DATE,
+    
+FROM individual_data attr

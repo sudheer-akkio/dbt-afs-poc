@@ -14,21 +14,28 @@
 -- Optimized for RAG engine queries that need summary-level data
 -- Source: fact_transaction_enriched (detail table)
 -- 
+-- OPTIMIZATION STRATEGY:
+-- 1. Only aggregate strings when count > 1 (redundant when count = 1, NULL when count = 0)
+-- 2. ARRAY_AGG with DISTINCT automatically filters NULL values (cleaner data)
+-- 3. Use NULL instead of empty strings (better data quality, easier to query)
+-- 4. Conditional aggregation reduces unnecessary work when counts are 0 or 1
+-- 5. Pre-filter distinct values reduces aggregation overhead
+-- 
 -- PERFORMANCE OPTIMIZATIONS:
 -- 1. ARRAY_AGG + ARRAY_TO_STRING instead of LISTAGG - 2-3x faster
--- 2. Pre-filter distinct values before aggregation - 5-10x faster for LISTAGG
--- 3. Only select needed columns (not SELECT *) - reduces data scanned
+-- 2. Pre-filter NULLs and distinct values - reduces aggregation overhead
+-- 3. Conditional aggregation - skip when not needed
 -- 4. Incremental materialization - only processes new dates
 -- Expected improvement: 10-20x faster for incremental runs, 3-5x faster for full refresh
 -- ============================================================================
 
 WITH 
--- Step 1: Pre-filter to distinct values only (huge performance gain for aggregation)
+-- Step 1: Pre-filter to distinct values only (huge performance gain)
+-- NULLs will be filtered during aggregation, not here (to avoid losing rows)
 distinct_values AS (
     SELECT DISTINCT
         trans_date,
         AKKIO_ID,
-        -- Only the columns we need for LISTAGG
         merchant_description,
         merchant_category_code,
         merchant_city,
@@ -52,7 +59,7 @@ distinct_values AS (
         {% endif %}
 ),
 
--- Step 2: Aggregate metrics (separate from LISTAGG for better optimization)
+-- Step 2: Aggregate metrics and counts in single pass
 agg_metrics AS (
     SELECT
         trans_date,
@@ -81,32 +88,116 @@ agg_metrics AS (
     GROUP BY trans_date, AKKIO_ID
 ),
 
--- Step 3: Use ARRAY_AGG instead of LISTAGG (faster, especially with DISTINCT)
+-- Step 3: Conditional string aggregations - only when count > 1
+-- Filter NULLs explicitly and only aggregate when it adds value beyond the count
+-- Key optimization: Skip aggregation when count = 1 (redundant) or count = 0 (no data)
 array_agg_values AS (
     SELECT
         trans_date,
         AKKIO_ID,
-        ARRAY_TO_STRING(ARRAY_AGG(DISTINCT merchant_description), ',') AS merchant_description_str_list,
-        ARRAY_TO_STRING(ARRAY_AGG(DISTINCT merchant_category_code), ',') AS merchant_category_code_str_list,
-        ARRAY_TO_STRING(ARRAY_AGG(DISTINCT merchant_city), ',') AS merchant_city_str_list,
-        ARRAY_TO_STRING(ARRAY_AGG(DISTINCT merchant_state), ',') AS merchant_state_str_list,
-        ARRAY_TO_STRING(ARRAY_AGG(DISTINCT merchant_zip), ',') AS merchant_zip_str_list,
-        ARRAY_TO_STRING(ARRAY_AGG(DISTINCT merchant_country), ',') AS merchant_country_str_list,
-        ARRAY_TO_STRING(ARRAY_AGG(DISTINCT store_name), ',') AS store_name_str_list,
-        ARRAY_TO_STRING(ARRAY_AGG(DISTINCT brand_name), ',') AS brand_name_str_list,
-        ARRAY_TO_STRING(ARRAY_AGG(DISTINCT store_type), ',') AS store_type_str_list,
-        ARRAY_TO_STRING(ARRAY_AGG(DISTINCT brand_type), ',') AS brand_type_str_list,
-        ARRAY_TO_STRING(ARRAY_AGG(DISTINCT brand_tagging_classification), ',') AS brand_tagging_classification_str_list,
-        ARRAY_TO_STRING(ARRAY_AGG(DISTINCT transaction_channel), ',') AS transaction_channel_str_list,
-        ARRAY_TO_STRING(ARRAY_AGG(DISTINCT store_city), ',') AS store_city_str_list,
-        ARRAY_TO_STRING(ARRAY_AGG(DISTINCT store_state), ',') AS store_state_str_list,
-        ARRAY_TO_STRING(ARRAY_AGG(DISTINCT store_zip), ',') AS store_zip_str_list,
-        ARRAY_TO_STRING(ARRAY_AGG(DISTINCT store_country), ',') AS store_country_str_list
+        -- Only aggregate when there are multiple distinct non-NULL values (> 1)
+        -- Returns NULL when count = 0 or count = 1 (cleaner than empty strings)
+        -- ARRAY_AGG with DISTINCT automatically filters NULLs in Snowflake
+        CASE 
+            WHEN COUNT(DISTINCT merchant_description) > 1 
+            THEN ARRAY_TO_STRING(ARRAY_AGG(DISTINCT merchant_description), ',')
+            ELSE NULL
+        END AS merchant_description_str_list,
+        
+        CASE 
+            WHEN COUNT(DISTINCT merchant_category_code) > 1 
+            THEN ARRAY_TO_STRING(ARRAY_AGG(DISTINCT merchant_category_code), ',')
+            ELSE NULL
+        END AS merchant_category_code_str_list,
+        
+        CASE 
+            WHEN COUNT(DISTINCT merchant_city) > 1 
+            THEN ARRAY_TO_STRING(ARRAY_AGG(DISTINCT merchant_city), ',')
+            ELSE NULL
+        END AS merchant_city_str_list,
+        
+        CASE 
+            WHEN COUNT(DISTINCT merchant_state) > 1 
+            THEN ARRAY_TO_STRING(ARRAY_AGG(DISTINCT merchant_state), ',')
+            ELSE NULL
+        END AS merchant_state_str_list,
+        
+        CASE 
+            WHEN COUNT(DISTINCT merchant_zip) > 1 
+            THEN ARRAY_TO_STRING(ARRAY_AGG(DISTINCT merchant_zip), ',')
+            ELSE NULL
+        END AS merchant_zip_str_list,
+        
+        CASE 
+            WHEN COUNT(DISTINCT merchant_country) > 1 
+            THEN ARRAY_TO_STRING(ARRAY_AGG(DISTINCT merchant_country), ',')
+            ELSE NULL
+        END AS merchant_country_str_list,
+        
+        CASE 
+            WHEN COUNT(DISTINCT store_name) > 1 
+            THEN ARRAY_TO_STRING(ARRAY_AGG(DISTINCT store_name), ',')
+            ELSE NULL
+        END AS store_name_str_list,
+        
+        CASE 
+            WHEN COUNT(DISTINCT brand_name) > 1 
+            THEN ARRAY_TO_STRING(ARRAY_AGG(DISTINCT brand_name), ',')
+            ELSE NULL
+        END AS brand_name_str_list,
+        
+        CASE 
+            WHEN COUNT(DISTINCT store_type) > 1 
+            THEN ARRAY_TO_STRING(ARRAY_AGG(DISTINCT store_type), ',')
+            ELSE NULL
+        END AS store_type_str_list,
+        
+        CASE 
+            WHEN COUNT(DISTINCT brand_type) > 1 
+            THEN ARRAY_TO_STRING(ARRAY_AGG(DISTINCT brand_type), ',')
+            ELSE NULL
+        END AS brand_type_str_list,
+        
+        CASE 
+            WHEN COUNT(DISTINCT brand_tagging_classification) > 1 
+            THEN ARRAY_TO_STRING(ARRAY_AGG(DISTINCT brand_tagging_classification), ',')
+            ELSE NULL
+        END AS brand_tagging_classification_str_list,
+        
+        CASE 
+            WHEN COUNT(DISTINCT transaction_channel) > 1 
+            THEN ARRAY_TO_STRING(ARRAY_AGG(DISTINCT transaction_channel), ',')
+            ELSE NULL
+        END AS transaction_channel_str_list,
+        
+        CASE 
+            WHEN COUNT(DISTINCT store_city) > 1 
+            THEN ARRAY_TO_STRING(ARRAY_AGG(DISTINCT store_city), ',')
+            ELSE NULL
+        END AS store_city_str_list,
+        
+        CASE 
+            WHEN COUNT(DISTINCT store_state) > 1 
+            THEN ARRAY_TO_STRING(ARRAY_AGG(DISTINCT store_state), ',')
+            ELSE NULL
+        END AS store_state_str_list,
+        
+        CASE 
+            WHEN COUNT(DISTINCT store_zip) > 1 
+            THEN ARRAY_TO_STRING(ARRAY_AGG(DISTINCT store_zip), ',')
+            ELSE NULL
+        END AS store_zip_str_list,
+        
+        CASE 
+            WHEN COUNT(DISTINCT store_country) > 1 
+            THEN ARRAY_TO_STRING(ARRAY_AGG(DISTINCT store_country), ',')
+            ELSE NULL
+        END AS store_country_str_list
     FROM distinct_values
     GROUP BY trans_date, AKKIO_ID
 )
 
--- Final join
+-- Final join - use NULL instead of empty strings for better data quality
 SELECT
     am.trans_date,
     am.AKKIO_ID,
@@ -121,22 +212,23 @@ SELECT
     am.card_type,
     am.card_zip,
     am.areaid,
-    COALESCE(aav.merchant_description_str_list, '') AS merchant_description_str_list,
-    COALESCE(aav.merchant_category_code_str_list, '') AS merchant_category_code_str_list,
-    COALESCE(aav.merchant_city_str_list, '') AS merchant_city_str_list,
-    COALESCE(aav.merchant_state_str_list, '') AS merchant_state_str_list,
-    COALESCE(aav.merchant_zip_str_list, '') AS merchant_zip_str_list,
-    COALESCE(aav.merchant_country_str_list, '') AS merchant_country_str_list,
-    COALESCE(aav.store_name_str_list, '') AS store_name_str_list,
-    COALESCE(aav.brand_name_str_list, '') AS brand_name_str_list,
-    COALESCE(aav.store_type_str_list, '') AS store_type_str_list,
-    COALESCE(aav.brand_type_str_list, '') AS brand_type_str_list,
-    COALESCE(aav.brand_tagging_classification_str_list, '') AS brand_tagging_classification_str_list,
-    COALESCE(aav.transaction_channel_str_list, '') AS transaction_channel_str_list,
-    COALESCE(aav.store_city_str_list, '') AS store_city_str_list,
-    COALESCE(aav.store_state_str_list, '') AS store_state_str_list,
-    COALESCE(aav.store_zip_str_list, '') AS store_zip_str_list,
-    COALESCE(aav.store_country_str_list, '') AS store_country_str_list,
+    -- Use NULL instead of empty strings - cleaner data, better for analytics
+    aav.merchant_description_str_list,
+    aav.merchant_category_code_str_list,
+    aav.merchant_city_str_list,
+    aav.merchant_state_str_list,
+    aav.merchant_zip_str_list,
+    aav.merchant_country_str_list,
+    aav.store_name_str_list,
+    aav.brand_name_str_list,
+    aav.store_type_str_list,
+    aav.brand_type_str_list,
+    aav.brand_tagging_classification_str_list,
+    aav.transaction_channel_str_list,
+    aav.store_city_str_list,
+    aav.store_state_str_list,
+    aav.store_zip_str_list,
+    aav.store_country_str_list,
     am.unique_merchant_count,
     am.unique_store_count,
     am.unique_brand_count,
