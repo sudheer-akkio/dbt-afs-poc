@@ -16,20 +16,6 @@
     where multiple individuals may share a household.
 */
 
-WITH individual_data AS (
-    SELECT
-        attr.*,
-        media.APP_SERVICES_USED AS MEDIA_USED_APPS,
-        media.NETWORKS_WATCHED AS MEDIA_NETWORK_WATCHED,
-        media.TITLES_WATCHED AS MEDIA_TITLES_WATCHED,
-        media.GENRES_WATCHED AS MEDIA_GENRES_WATCHED,
-        media.INPUT_DEVICES_USED AS MEDIA_INPUT_DEVICES
-    FROM {{ ref('v_akkio_attributes_latest') }} attr
-    LEFT JOIN {{ ref('v_agg_akkio_ind_media') }} media
-        ON attr.AKKIO_ID = media.AKKIO_ID
-        AND attr.PARTITION_DATE = media.PARTITION_DATE
-)
-
 SELECT
     -- Primary Keys
     attr.AKKIO_ID,
@@ -179,6 +165,6 @@ SELECT
     END AS INVESTMENT_TYPE,
 
     -- Partition Date
-    attr.PARTITION_DATE,
+    attr.PARTITION_DATE
     
-FROM individual_data attr
+FROM {{ ref('v_akkio_attributes_latest') }} attr
