@@ -20,12 +20,14 @@ SELECT
     -- Primary Keys
     attr.AKKIO_ID,
     attr.AKKIO_HH_ID,
+
+    1 as WEIGHT,
     
     -- Demographics
     CASE 
         WHEN attr.GENDER = 'MALE' THEN 'M'
         WHEN attr.GENDER = 'FEMALE' THEN 'F'
-        ELSE NULL
+        ELSE 'UNDETERMINED'
     END AS GENDER,
     attr.ZIP_CODE,
     attr.AGE,
@@ -45,7 +47,7 @@ SELECT
                 ELSE 6
             END
         WHEN attr.AGE_BUCKET = '60+' THEN 6
-        ELSE NULL
+        ELSE 0 -- no null allowed for age 
     END AS AGE_BUCKET,
     
     -- Age Bucket Detailed: More granular age buckets (1-12)
@@ -68,13 +70,13 @@ SELECT
                 ELSE 9
             END
         WHEN attr.AGE_BUCKET = '60+' THEN 9
-        ELSE NULL
+        ELSE 0
     END AS AGE_BUCKET_DETAILED,
     
     attr.ETHNICITY AS ETHNICITY_PREDICTION,
     attr.EDUCATION_LEVEL AS EDUCATION,
     attr.MARITAL_STATUS,
-    attr.STATE_ABBR AS STATE,
+    attr.STATE AS STATE,
     attr.OCCUPATION,
     
     -- Contact identifiers (placeholders for future enrichment)
