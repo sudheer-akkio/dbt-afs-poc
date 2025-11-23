@@ -116,16 +116,20 @@ erDiagram
         string EDUCATION_MODEL
         string MARITAL_STATUS
         string HOMEOWNER_STATUS
-        string HOUSEHOLD_INCOME_K
+        int HOUSEHOLD_INCOME_K
         string INCOME_BUCKET
-        string WEALTH
-        string WEALTH_BUCKET
+        string NET_WORTH_BUCKET
+        string FINANCIAL_HEALTH_BUCKET
         string POLITICS
-        string POLITICS_NORMALIZED
         string BUSINESS_OWNER
-        string BUSINESS_OWNER_FLAG
         int ADULTS_IN_HH
-        int CHILDREN
+        int NUMBER_OF_CHILDREN
+        int PRESENCE_OF_CHILDREN
+        int NUM_PEOPLE_IN_HOUSEHOLD_GROUP
+        string CHILD_AGE_GROUP
+        string OCCUPATION
+        string OCCUPATION_MODEL
+        int MEDIAN_HOME_VALUE_BY_STATE
         string STATE_ABBR
         string ZIP_CODE
         string CITY
@@ -134,6 +138,13 @@ erDiagram
         string CBSA_TYPE
         string METRO_FLAG
         string MARKET_AREA_TYPE
+        object GENERAL_INTERESTS_*
+        object SPORTS_INTERESTS_*
+        object READING_INTERESTS_*
+        object TRAVEL_INTERESTS_*
+        object CREDIT_CARD_INFO_*
+        string INVESTMENT_TYPE_*
+        object MEDIA_*
     }
     
     FACT_TRANSACTION_ENRICHED {
@@ -213,56 +224,44 @@ erDiagram
     V_AGG_AKKIO_IND {
         string AKKIO_ID PK
         string AKKIO_HH_ID
-        int WEIGHT
         string GENDER
-        int AGE
-        string AGE_BUCKET
-        string ETHNICITY
-        string EDUCATION_LEVEL
-        string MARITAL_STATUS
-        string HOMEOWNER
-        string INCOME
-        string INCOME_BUCKET
-        string WEALTH
-        string WEALTH_BUCKET
-        string POLITICS
-        string POLITICS_NORMALIZED
-        string BUSINESS_OWNER
-        string BUSINESS_OWNER_FLAG
-        int ADULTS_IN_HH
-        int CHILDREN
-        int MAIDS
-        int IPS
-        int EMAILS
-        int PHONES
-        string STATE_ABBR
         string ZIP_CODE
-        string CITY
-        string COUNTY_NAME
-        string CBSA_CODE
-        string CBSA_TYPE
-        string METRO_FLAG
-        string MARKET_AREA_TYPE
-        string EDUCATION_MODEL
-        int YEAR_OF_BIRTH
+        int AGE
+        int AGE_BUCKET
+        int AGE_BUCKET_DETAILED
+        string ETHNICITY_PREDICTION
+        string EDUCATION
+        string MARITAL_STATUS
+        string STATE
+        string OCCUPATION
+        int EMAILS
+        int MAIDS
+        int PHONES
+        int IPS
+        object GENERAL_INTERESTS
+        object SPORTS_INTERESTS
+        object READING_INTERESTS
+        object TRAVEL_INTERESTS
+        int FINANCIAL_HEALTH_BUCKET
+        string NET_WORTH_BUCKET
+        object CREDIT_CARD_INFO
+        string INVESTMENT_TYPE
         date PARTITION_DATE
     }
     
     V_AGG_AKKIO_HH {
+        date PARTITION_DATE PK
         string AKKIO_HH_ID PK
+        int INCOME
+        int INCOME_BUCKET
+        object CHILD_AGE_GROUP
+        int HOMEOWNER
+        int NUMBER_OF_CHILDREN
+        int PRESENCE_OF_CHILDREN
+        int NUM_PEOPLE_IN_HOUSEHOLD
+        int NUM_PEOPLE_IN_HOUSEHOLD_GROUP
+        object MEDIAN_HOME_VALUE_BY_STATE
         int HH_WEIGHT
-        string HOMEOWNER
-        string INCOME
-        string INCOME_BUCKET
-        string WEALTH
-        string WEALTH_BUCKET
-        int ADULTS_IN_HH
-        int CHILDREN
-        string STATE_ABBR
-        string ZIP_CODE
-        string CITY
-        string COUNTY_NAME
-        date PARTITION_DATE
     }
 ```
 
@@ -285,14 +284,14 @@ erDiagram
 
 - **V_AKKIO_ATTRIBUTES_LATEST** (1) ──────< (N) **FACT_TRANSACTION_ENRICHED**: One individual can have many transactions
 - **FACT_TRANSACTION_ENRICHED** (N) ──────> (1) **FACT_TRANSACTION_SUMMARY**: Many transaction detail rows aggregate to one daily summary row per individual
-- **V_AKKIO_ATTRIBUTES_LATEST** (1) ──────> (1) **V_AGG_AKKIO_IND**: One individual aggregates to one individual aggregation row
-- **V_AKKIO_ATTRIBUTES_LATEST** (1) ──────> (1) **V_AGG_AKKIO_HH**: One individual aggregates to one household aggregation row (currently 1:1, structured for future household scenarios)
+- **V_AKKIO_ATTRIBUTES_LATEST** (1) ──────> (1) **V_AGG_AKKIO_IND**: One individual per PARTITION_DATE aggregates to one individual aggregation row per PARTITION_DATE
+- **V_AKKIO_ATTRIBUTES_LATEST** (1) ──────> (1) **V_AGG_AKKIO_HH**: One individual per PARTITION_DATE aggregates to one household aggregation row per PARTITION_DATE (currently 1:1, structured for future household scenarios)
 
 ### Data Model Notes
 
 #### dbt Models
 
-- **V_AKKIO_ATTRIBUTES_LATEST**: Individual Attributes Dimension - One row per individual with all normalized demographic attributes. Primary key is `AKKIO_ID` (formerly `afs_individual_id`). Contains 800+ demographic attributes with normalized values for gender, ethnicity, politics, income, wealth, etc. Generated from `INDIVIDUAL_DEMOGRAPHIC_SPINE` source table.
+- **V_AKKIO_ATTRIBUTES_LATEST**: Individual Attributes Dimension - One row per individual with all normalized demographic attributes. Primary key is `AKKIO_ID` (formerly `afs_individual_id`). Contains 800+ demographic attributes with normalized values for gender, ethnicity, politics, income, net worth, financial health, occupation, interests (general, sports, reading, travel), credit card info, investment types, and media consumption preferences. Generated from `INDIVIDUAL_DEMOGRAPHIC_SPINE` source table. Includes household composition fields (NUMBER_OF_CHILDREN, PRESENCE_OF_CHILDREN, CHILD_AGE_GROUP, etc.).
 
 - **FACT_TRANSACTION_ENRICHED**: Detail Transaction Fact Table - Denormalized transaction table with `AKKIO_ID` for easy joining to attributes table. Contains granular detail about each individual transaction. Built by joining 6 source tables:
   - **TRANSACTION** (base table): Transaction facts (txid, trans_date, trans_time, trans_amount, etc.)
@@ -309,15 +308,15 @@ erDiagram
   - **Materialization**: Table (clustered by trans_date, AKKIO_ID)
   - **Use Case**: Preferred table for most analytics queries; use `FACT_TRANSACTION_ENRICHED` only when transaction-level detail is needed
 
-- **V_AGG_AKKIO_IND**: Individual Aggregation Table - One row per individual (`AKKIO_ID`) with aggregated demographic attributes optimized for analytics. Generated from `V_AKKIO_ATTRIBUTES_LATEST`. Includes weight field and contact identifier placeholders (MAIDS, IPS, EMAILS, PHONES).
+- **V_AGG_AKKIO_IND**: Individual Aggregation Table - One row per individual (`AKKIO_ID`) per `PARTITION_DATE` with aggregated demographic attributes optimized for analytics. Generated from `V_AKKIO_ATTRIBUTES_LATEST`. Includes contact identifier placeholders (MAIDS, IPS, EMAILS, PHONES), interests as OBJECTs (GENERAL_INTERESTS, SPORTS_INTERESTS, READING_INTERESTS, TRAVEL_INTERESTS), credit card info as OBJECT, and financial attributes. Age buckets are encoded as integers (1-7 for AGE_BUCKET, 1-12 for AGE_BUCKET_DETAILED).
 
-- **V_AGG_AKKIO_HH**: Household Aggregation Table - One row per household (`AKKIO_HH_ID`) with household-level attributes. Generated from `V_AKKIO_ATTRIBUTES_LATEST`. Currently 1:1 with individuals but structured for future scenarios where multiple individuals may share a household.
+- **V_AGG_AKKIO_HH**: Household Aggregation Table - One row per household (`AKKIO_HH_ID`) per `PARTITION_DATE` with household-level attributes. Generated from `V_AKKIO_ATTRIBUTES_LATEST`. Includes household income, child age groups as OBJECT, homeowner status as integer (0/1), and household composition metrics. Currently 1:1 with individuals but structured for future scenarios where multiple individuals may share a household.
 
 #### Design Principles
 
 - Both `V_AKKIO_ATTRIBUTES_LATEST` and transaction tables use `AKKIO_ID` as the bridge for flexible querying
 - Transactions are kept separate from individual attributes for optimal LLM query performance
 - `FACT_TRANSACTION_SUMMARY` provides aggregated daily summaries optimized for RAG queries; use `FACT_TRANSACTION_ENRICHED` only when transaction-level detail is required
-- All demographic fields are normalized (e.g., GENDER: MALE/FEMALE/UNKNOWN, ETHNICITY: HISPANIC/AFRICAN_AMERICAN/etc., POLITICS_NORMALIZED: DEMOCRAT_KNOWN/REPUBLICAN_INFERRED/etc.)
+- All demographic fields are normalized (e.g., GENDER: MALE/FEMALE/UNKNOWN, ETHNICITY: HISPANIC/AFRICAN_AMERICAN/etc., POLITICS: DEMOCRAT_KNOWN/REPUBLICAN_INFERRED/etc.)
 - All joins in `FACT_TRANSACTION_ENRICHED` are LEFT JOINs to preserve all transactions even if enrichment data is missing
 - `FACT_TRANSACTION_ENRICHED` uses incremental materialization for efficient processing of new transactions
