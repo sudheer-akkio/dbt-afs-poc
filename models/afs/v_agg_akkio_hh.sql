@@ -28,7 +28,7 @@ WITH household_data AS (
         NUM_PEOPLE_IN_HOUSEHOLD_GROUP,
         CHILD_AGE_GROUP,
         MEDIAN_HOME_VALUE_BY_STATE,
-        STATE_ABBR
+        STATE
     FROM {{ ref('v_akkio_attributes_latest') }}
 )
 
@@ -88,8 +88,8 @@ SELECT
     
     -- Median Home Value by State as OBJECT (state as key, value as median home value)
     CASE 
-        WHEN STATE_ABBR IS NOT NULL AND MEDIAN_HOME_VALUE_BY_STATE IS NOT NULL THEN
-            OBJECT_CONSTRUCT(STATE_ABBR, MEDIAN_HOME_VALUE_BY_STATE)
+        WHEN STATE IS NOT NULL AND MEDIAN_HOME_VALUE_BY_STATE IS NOT NULL THEN
+            OBJECT_CONSTRUCT(STATE, MEDIAN_HOME_VALUE_BY_STATE)
         ELSE NULL
     END AS MEDIAN_HOME_VALUE_BY_STATE,
     

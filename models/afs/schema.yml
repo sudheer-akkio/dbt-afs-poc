@@ -173,7 +173,7 @@ models:
         description: "Mutual fund investor indicator | :akkio-ml-ignore |"
       - name: INVESTMENT_TYPE_ONLINE_TRADING
         description: "Online trading participant indicator | :akkio-ml-ignore |"
-      - name: STATE_ABBR
+      - name: STATE
         description: "State abbreviation | :upper |"
       - name: ZIP_CODE
         description: "ZIP code"

@@ -126,7 +126,7 @@ erDiagram
         string BUSINESS_OWNER_FLAG
         int ADULTS_IN_HH
         int CHILDREN
-        string STATE_ABBR
+        string STATE
         string ZIP_CODE
         string CITY
         string COUNTY_NAME
@@ -235,7 +235,7 @@ erDiagram
         int IPS
         int EMAILS
         int PHONES
-        string STATE_ABBR
+        string STATE
         string ZIP_CODE
         string CITY
         string COUNTY_NAME
@@ -258,7 +258,7 @@ erDiagram
         string WEALTH_BUCKET
         int ADULTS_IN_HH
         int CHILDREN
-        string STATE_ABBR
+        string STATE
         string ZIP_CODE
         string CITY
         string COUNTY_NAME
