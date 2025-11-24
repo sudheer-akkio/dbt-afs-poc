@@ -56,7 +56,7 @@ SELECT
         WHEN source_data.combined_age_1 IS NULL OR source_data.combined_age_1 = '' THEN NULL
         WHEN LENGTH(source_data.combined_age_1) >= 2 THEN
             CASE 
-                WHEN CAST(SUBSTRING(source_data.combined_age_1, 2) AS INTEGER) BETWEEN 19 AND 24 THEN '19-24'
+                WHEN CAST(SUBSTRING(source_data.combined_age_1, 2) AS INTEGER) BETWEEN 18 AND 24 THEN '18-24'
                 WHEN CAST(SUBSTRING(source_data.combined_age_1, 2) AS INTEGER) BETWEEN 25 AND 29 THEN '25-29'
                 WHEN CAST(SUBSTRING(source_data.combined_age_1, 2) AS INTEGER) BETWEEN 30 AND 34 THEN '30-34'
                 WHEN CAST(SUBSTRING(source_data.combined_age_1, 2) AS INTEGER) BETWEEN 35 AND 39 THEN '35-39'
@@ -342,7 +342,7 @@ SELECT
     ) AS CHILD_AGE_GROUP,
     
     -- Geographic (normalized - original fields available via source_data.*)
-    source_data.stat_abbr AS STATE_ABBR,
+    source_data.stat_abbr AS STATE,
     source_data.recd_zipc AS ZIP_CODE,
     source_data.city_plac AS CITY,
     source_data.geo_cntyname AS COUNTY_NAME,
