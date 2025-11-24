@@ -76,8 +76,7 @@ SELECT
     -- Home Ownership (numeric 0/1: 1=Owner, 0=Renter, NULL=Unknown)
     CASE
         WHEN HOMEOWNER_STATUS = 'HOMEOWNER' THEN 1
-        WHEN HOMEOWNER_STATUS = 'RENTER' THEN 0
-        ELSE NULL
+        ELSE 0
     END AS HOMEOWNER,
     
     -- Household Composition
