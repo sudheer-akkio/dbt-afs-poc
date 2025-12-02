@@ -281,11 +281,12 @@ SELECT
         WHEN source_data.fin_fla_networth = 'O' THEN '2500000+'
         ELSE 'UNKNOWN'
     END AS NET_WORTH_BUCKET,
-    -- Financial Health Bucket (derived from net worth)
-    CASE 
+    -- Financial Health Bucket (derived from net worth): LOW, MEDIUM, HIGH, EXCELLENT
+    CASE
         WHEN source_data.fin_fla_networth IN ('A', 'B', 'C', 'D') THEN 'LOW'
         WHEN source_data.fin_fla_networth IN ('E', 'F', 'G', 'H') THEN 'MEDIUM'
-        WHEN source_data.fin_fla_networth IN ('I', 'J', 'K', 'L', 'M', 'N', 'O') THEN 'HIGH'
+        WHEN source_data.fin_fla_networth IN ('I', 'J', 'K', 'L') THEN 'HIGH'
+        WHEN source_data.fin_fla_networth IN ('M', 'N', 'O') THEN 'EXCELLENT'
         ELSE 'UNKNOWN'
     END AS FINANCIAL_HEALTH_BUCKET,
     
