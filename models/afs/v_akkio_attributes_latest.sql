@@ -321,9 +321,11 @@ SELECT
     -- Number of People in Household (rec_perscnt values: 0-8, blank=Blank)
     CAST(COALESCE(source_data.rec_perscnt, '0') AS INTEGER) AS NUM_PEOPLE_IN_HOUSEHOLD_GROUP,
     -- Presence of Children (pocv4_code: presence of child 0-18)
-    CASE 
-        WHEN source_data.pocv4_code IS NOT NULL AND source_data.pocv4_code != '' THEN 1
-        ELSE 0
+    -- 1Y=Known data, 5Y=Modeled likely → 1 (has children)
+    -- 5N=Not likely, 5U=Modeled not likely, 00=Deceased/child only → NULL (unknown/no data)
+    CASE
+        WHEN source_data.pocv4_code IN ('1Y', '5Y') THEN 1
+        ELSE NULL
     END AS PRESENCE_OF_CHILDREN,
     -- Child Age Group (aggregated from individual pocv4_*_code fields)
     -- pocv4_*_code values: 1Y=Known data (child present), 5Y=Modeled likely to have a child,
