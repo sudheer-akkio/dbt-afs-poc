@@ -335,10 +335,8 @@ models:
   - name: fact_transaction_enriched
     description: >
       Detail Transaction Fact Table - Adds AKKIO_ID to transactions for easy joining to attributes table. Includes merchant, brand, and location attributes.
-      This contains the same data as FACT_TRANSACTION_SUMMARY table with aggregated columns exploded into separate rows.
-      ONLY use this table when FACT_TRANSACTION_SUMMARY contains insufficient detail to answer the query.
-      This provides granular detail about each individual transaction.
-      | :short-name:transaction_detail: :use_for_audience_gen: |
+      Provides granular detail about each individual transaction.
+      | :short-name:transaction_detail: :use_for_audience_gen:yes: |
       
     columns:
       - name: txid
