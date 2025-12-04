@@ -130,7 +130,8 @@ erDiagram
         string OCCUPATION
         string OCCUPATION_MODEL
         int MEDIAN_HOME_VALUE_BY_STATE
-        string STATE_ABBR
+        string STATE
+        string ZIP11
         string ZIP_CODE
         string CITY
         string COUNTY_NAME

@@ -56,7 +56,7 @@ SELECT
         WHEN source_data.combined_age_1 IS NULL OR source_data.combined_age_1 = '' THEN NULL
         WHEN LENGTH(source_data.combined_age_1) >= 2 THEN
             CASE 
-                WHEN CAST(SUBSTRING(source_data.combined_age_1, 2) AS INTEGER) BETWEEN 19 AND 24 THEN '19-24'
+                WHEN CAST(SUBSTRING(source_data.combined_age_1, 2) AS INTEGER) BETWEEN 18 AND 24 THEN '18-24'
                 WHEN CAST(SUBSTRING(source_data.combined_age_1, 2) AS INTEGER) BETWEEN 25 AND 29 THEN '25-29'
                 WHEN CAST(SUBSTRING(source_data.combined_age_1, 2) AS INTEGER) BETWEEN 30 AND 34 THEN '30-34'
                 WHEN CAST(SUBSTRING(source_data.combined_age_1, 2) AS INTEGER) BETWEEN 35 AND 39 THEN '35-39'
@@ -281,11 +281,12 @@ SELECT
         WHEN source_data.fin_fla_networth = 'O' THEN '2500000+'
         ELSE 'UNKNOWN'
     END AS NET_WORTH_BUCKET,
-    -- Financial Health Bucket (derived from net worth)
-    CASE 
+    -- Financial Health Bucket (derived from net worth): LOW, MEDIUM, HIGH, EXCELLENT
+    CASE
         WHEN source_data.fin_fla_networth IN ('A', 'B', 'C', 'D') THEN 'LOW'
         WHEN source_data.fin_fla_networth IN ('E', 'F', 'G', 'H') THEN 'MEDIUM'
-        WHEN source_data.fin_fla_networth IN ('I', 'J', 'K', 'L', 'M', 'N', 'O') THEN 'HIGH'
+        WHEN source_data.fin_fla_networth IN ('I', 'J', 'K', 'L') THEN 'HIGH'
+        WHEN source_data.fin_fla_networth IN ('M', 'N', 'O') THEN 'EXCELLENT'
         ELSE 'UNKNOWN'
     END AS FINANCIAL_HEALTH_BUCKET,
     
@@ -321,9 +322,11 @@ SELECT
     -- Number of People in Household (rec_perscnt values: 0-8, blank=Blank)
     CAST(COALESCE(source_data.rec_perscnt, '0') AS INTEGER) AS NUM_PEOPLE_IN_HOUSEHOLD_GROUP,
     -- Presence of Children (pocv4_code: presence of child 0-18)
-    CASE 
-        WHEN source_data.pocv4_code IS NOT NULL AND source_data.pocv4_code != '' THEN 1
-        ELSE 0
+    -- 1Y=Known data, 5Y=Modeled likely → 1 (has children)
+    -- 5N=Not likely, 5U=Modeled not likely, 00=Deceased/child only → NULL (unknown/no data)
+    CASE
+        WHEN source_data.pocv4_code IN ('1Y', '5Y') THEN 1
+        ELSE NULL
     END AS PRESENCE_OF_CHILDREN,
     -- Child Age Group (aggregated from individual pocv4_*_code fields)
     -- pocv4_*_code values: 1Y=Known data (child present), 5Y=Modeled likely to have a child,
@@ -342,7 +345,7 @@ SELECT
     ) AS CHILD_AGE_GROUP,
     
     -- Geographic (normalized - original fields available via source_data.*)
-    source_data.stat_abbr AS STATE_ABBR,
+    source_data.stat_abbr AS STATE,
     source_data.recd_zipc AS ZIP_CODE,
     source_data.city_plac AS CITY,
     source_data.geo_cntyname AS COUNTY_NAME,

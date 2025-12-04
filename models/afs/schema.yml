@@ -18,125 +18,125 @@ models:
       - name: PARTITION_DATE
         description: "Activity date (from lu_a_adat in YYYYMMDD format) or current date if not available | :akkio-context-ignore |"
       - name: GENDER
-        description: "Normalized gender: MALE, FEMALE, UNKNOWN, BOTH (Male/Female Pair), or UNDETERMINED | :ml-encoding-nominal |"
+        description: "Normalized gender: MALE, FEMALE, UNKNOWN, BOTH (Male/Female Pair), or UNDETERMINED | :DEMOGRAPHICS :ml-encoding-nominal |"
       - name: AGE
-        description: "Extracted age from combined_age_1 (E25 or I25 format)"
+        description: "Extracted age from combined_age_1 (E25 or I25 format) | :DEMOGRAPHICS |"
       - name: AGE_BUCKET
-        description: "Age range bucket: 19-24, 25-29, 30-34, 35-39, 40-44, 45-49, 50-54, 55-59, 60+ | :akkio-ml-ignore |"
+        description: "Age range bucket: 19-24, 25-29, 30-34, 35-39, 40-44, 45-49, 50-54, 55-59, 60+ | :DEMOGRAPHICS :akkio-ml-ignore |"
       - name: YEAR_OF_BIRTH
-        description: "Year of birth"
+        description: "Year of birth | :DEMOGRAPHICS |"
       - name: ETHNICITY
-        description: "Normalized ethnicity: HISPANIC, AFRICAN_AMERICAN, SOUTHEAST_ASIAN, SOUTH_ASIAN, CENTRAL_ASIAN, MEDITERRANEAN, NATIVE_AMERICAN, SCANDINAVIAN, POLYNESIAN, MIDDLE_EASTERN, JEWISH, WESTERN_EUROPEAN, EASTERN_EUROPEAN, CARIBBEAN_NON_HISPANIC, EAST_ASIAN, UNCODED, or UNDETERMINED | :ml-encoding-nominal |"
+        description: "Normalized ethnicity: HISPANIC, AFRICAN_AMERICAN, SOUTHEAST_ASIAN, SOUTH_ASIAN, CENTRAL_ASIAN, MEDITERRANEAN, NATIVE_AMERICAN, SCANDINAVIAN, POLYNESIAN, MIDDLE_EASTERN, JEWISH, WESTERN_EUROPEAN, EASTERN_EUROPEAN, CARIBBEAN_NON_HISPANIC, EAST_ASIAN, UNCODED, or UNDETERMINED | :DEMOGRAPHICS :ml-encoding-nominal |"
       - name: EDUCATION_LEVEL
-        description: "Education level code"
+        description: "Education level code | :DEMOGRAPHICS |"
       - name: EDUCATION_MODEL
-        description: "Education model code"
+        description: "Education model code | :DEMOGRAPHICS |"
       - name: MARITAL_STATUS
-        description: "Marital status code"
+        description: "Marital status code | :HOUSEHOLDCOMPOSITION |"
       - name: HOMEOWNER_STATUS
-        description: "Homeowner status: HOMEOWNER, RENTER, or UNKNOWN"
+        description: "Homeowner status: HOMEOWNER, RENTER, or UNKNOWN | :PROPERTYOWNERSHIP |"
       - name: HOUSEHOLD_INCOME_K
-        description: "Household income in thousands (001-250, 000=Unknown)"
+        description: "Household income in thousands (001-250, 000=Unknown) | :FINANCIAL |"
       - name: INCOME_BUCKET
-        description: "Income range bucket: 1K_14K, 15K_24K, 25K_34K, 35K_49K, 50K_74K, 75K_99K, 100K_124K, 125K_149K, 150K_174K, 175K_199K, 200K_249K, 250K_PLUS, UNKNOWN, or UNDETERMINED | :akkio-ml-ignore |"
+        description: "Income range bucket: 1K_14K, 15K_24K, 25K_34K, 35K_49K, 50K_74K, 75K_99K, 100K_124K, 125K_149K, 150K_174K, 175K_199K, 200K_249K, 250K_PLUS, UNKNOWN, or UNDETERMINED | :FINANCIAL :akkio-ml-ignore |"
       - name: NET_WORTH_BUCKET
-        description: "Net worth bucket: 0_4999, 5000_14999, 15000_24999, 25000_49999, 50000_99999, 100000_199999, 200000_299999, 300000_399999, 400000_499999, 500000_599999, 600000_699999, 700000_799999, 800000_999999, 1000000_2499999, 2500000+, or UNKNOWN | :akkio-ml-ignore |"
+        description: "Net worth bucket: 0_4999, 5000_14999, 15000_24999, 25000_49999, 50000_99999, 100000_199999, 200000_299999, 300000_399999, 400000_499999, 500000_599999, 600000_699999, 700000_799999, 800000_999999, 1000000_2499999, 2500000+, or UNKNOWN | :FINANCIAL :akkio-ml-ignore |"
       - name: FINANCIAL_HEALTH_BUCKET
-        description: "Financial health bucket: LOW, MEDIUM, HIGH, or UNKNOWN | :akkio-ml-ignore |"
+        description: "Financial health bucket: LOW, MEDIUM, HIGH, or UNKNOWN | :FINANCIAL :akkio-ml-ignore |"
       - name: POLITICS
         description: "Normalized political affiliation: UNKNOWN, DEMOCRAT_KNOWN, INDEPENDENT_KNOWN, REPUBLICAN_KNOWN, DEMOCRAT_INFERRED, INDEPENDENT_INFERRED, NON_REGISTERED_INFERRED, REPUBLICAN_INFERRED, or UNDETERMINED | :ml-encoding-nominal |"
       - name: BUSINESS_OWNER
-        description: "Business owner status: YES, NO, or UNKNOWN"
+        description: "Business owner status: YES, NO, or UNKNOWN | :EMPLOYMENT |"
       - name: ADULTS_IN_HH
-        description: "Number of adults in household (0-8)"
+        description: "Number of adults in household (0-8) | :HOUSEHOLDCOMPOSITION |"
       - name: NUMBER_OF_CHILDREN
-        description: "Number of children in household (0-8) | :akkio-ml-ignore |"
+        description: "Number of children in household (0-8) | :HOUSEHOLDCOMPOSITION :akkio-ml-ignore |"
       - name: PRESENCE_OF_CHILDREN
-        description: "Presence of children indicator (0=No, 1=Yes) | :akkio-ml-ignore |"
+        description: "Presence of children indicator (0=No, 1=Yes) | :HOUSEHOLDCOMPOSITION :akkio-ml-ignore |"
       - name: NUM_PEOPLE_IN_HOUSEHOLD_GROUP
-        description: "Number of people in household group (0-8) | :akkio-ml-ignore |"
+        description: "Number of people in household group (0-8) | :HOUSEHOLDCOMPOSITION :akkio-ml-ignore |"
       - name: CHILD_AGE_GROUP
-        description: "Comma-separated list of child age groups present in household (e.g., '0-3, 4-6, 10-12'). Values: 0-3, 4-6, 7-9, 10-12, 13-15, 16-18. NULL if no children present. Derived from pocv4_*_code fields where 1Y (known) or 5Y (modeled likely) indicates presence. | :akkio-ml-ignore :lower :space-to-hyphen :csv |"
+        description: "Comma-separated list of child age groups present in household (e.g., '0-3, 4-6, 10-12'). Values: 0-3, 4-6, 7-9, 10-12, 13-15, 16-18. NULL if no children present. Derived from pocv4_*_code fields where 1Y (known) or 5Y (modeled likely) indicates presence. | :HOUSEHOLDCOMPOSITION :akkio-ml-ignore :lower :space-to-hyphen :csv |"
       - name: OCCUPATION
-        description: "Occupation code from ocup_ocup_1 | :ml-encoding-nominal |"
+        description: "Occupation code from ocup_ocup_1 | :EMPLOYMENT :ml-encoding-nominal |"
       - name: OCCUPATION_MODEL
-        description: "Occupation model code from ocup_model_v2_1 | :ml-encoding-nominal |"
+        description: "Occupation model code from ocup_model_v2_1 | :EMPLOYMENT :ml-encoding-nominal |"
       - name: MEDIAN_HOME_VALUE_BY_STATE
-        description: "Median home value by state from CAPE2020 data | :akkio-ml-ignore |"
+        description: "Median home value by state from CAPE2020 data | :GEOGRAPHY :akkio-ml-ignore |"
       - name: GENERAL_INTERESTS_ARTS_CRAFTS
-        description: "General interest in arts and crafts | :akkio-ml-ignore |"
+        description: "General interest in arts and crafts | :INTERESTS :akkio-ml-ignore |"
       - name: GENERAL_INTERESTS_BOOK_READER
-        description: "General interest in book reading | :akkio-ml-ignore |"
+        description: "General interest in book reading | :INTERESTS :akkio-ml-ignore |"
       - name: GENERAL_INTERESTS_CULTURAL_ARTS
-        description: "General interest in cultural arts | :akkio-ml-ignore |"
+        description: "General interest in cultural arts | :INTERESTS :akkio-ml-ignore |"
       - name: GENERAL_INTERESTS_DIY
-        description: "General interest in do-it-yourself activities | :akkio-ml-ignore |"
+        description: "General interest in do-it-yourself activities | :INTERESTS :akkio-ml-ignore |"
       - name: GENERAL_INTERESTS_GOURMET_COOKING
-        description: "General interest in gourmet cooking | :akkio-ml-ignore |"
+        description: "General interest in gourmet cooking | :INTERESTS :akkio-ml-ignore |"
       - name: GENERAL_INTERESTS_HEALTHY_LIVING
-        description: "General interest in healthy living | :akkio-ml-ignore |"
+        description: "General interest in healthy living | :INTERESTS :akkio-ml-ignore |"
       - name: GENERAL_INTERESTS_HOME_IMPROVEMENT
-        description: "General interest in home improvement | :akkio-ml-ignore |"
+        description: "General interest in home improvement | :INTERESTS :akkio-ml-ignore |"
       - name: GENERAL_INTERESTS_PHOTOGRAPHY
-        description: "General interest in photography | :akkio-ml-ignore |"
+        description: "General interest in photography | :INTERESTS :akkio-ml-ignore |"
       - name: GENERAL_INTERESTS_SCRAPBOOKING
-        description: "General interest in scrapbooking | :akkio-ml-ignore |"
+        description: "General interest in scrapbooking | :INTERESTS :akkio-ml-ignore |"
       - name: SPORTS_INTERESTS_RUNNING
-        description: "Sports interest in running | :akkio-ml-ignore |"
+        description: "Sports interest in running | :INTERESTS :akkio-ml-ignore |"
       - name: SPORTS_INTERESTS_FITNESS
-        description: "Sports interest in fitness | :akkio-ml-ignore |"
+        description: "Sports interest in fitness | :INTERESTS :akkio-ml-ignore |"
       - name: SPORTS_INTERESTS_HUNTING
-        description: "Sports interest in hunting | :akkio-ml-ignore |"
+        description: "Sports interest in hunting | :INTERESTS :akkio-ml-ignore |"
       - name: SPORTS_INTERESTS_NASCAR
-        description: "Sports interest in NASCAR | :akkio-ml-ignore |"
+        description: "Sports interest in NASCAR | :INTERESTS :akkio-ml-ignore |"
       - name: SPORTS_INTERESTS_MLB
-        description: "Sports interest in MLB (Major League Baseball) | :akkio-ml-ignore |"
+        description: "Sports interest in MLB (Major League Baseball) | :INTERESTS :akkio-ml-ignore |"
       - name: SPORTS_INTERESTS_NBA
-        description: "Sports interest in NBA (National Basketball Association) | :akkio-ml-ignore |"
+        description: "Sports interest in NBA (National Basketball Association) | :INTERESTS :akkio-ml-ignore |"
       - name: SPORTS_INTERESTS_NFL
-        description: "Sports interest in NFL (National Football League) | :akkio-ml-ignore |"
+        description: "Sports interest in NFL (National Football League) | :INTERESTS :akkio-ml-ignore |"
       - name: SPORTS_INTERESTS_NHL
-        description: "Sports interest in NHL (National Hockey League) | :akkio-ml-ignore |"
+        description: "Sports interest in NHL (National Hockey League) | :INTERESTS :akkio-ml-ignore |"
       - name: SPORTS_INTERESTS_OUTDOOR
-        description: "Sports interest in outdoor activities | :akkio-ml-ignore |"
+        description: "Sports interest in outdoor activities | :INTERESTS :akkio-ml-ignore |"
       - name: SPORTS_INTERESTS_PGA
-        description: "Sports interest in PGA Tour | :akkio-ml-ignore |"
+        description: "Sports interest in PGA Tour | :INTERESTS :akkio-ml-ignore |"
       - name: SPORTS_INTERESTS_GOLF
-        description: "Sports interest in golf | :akkio-ml-ignore |"
+        description: "Sports interest in golf | :INTERESTS :akkio-ml-ignore |"
       - name: SPORTS_INTERESTS_HOCKEY
-        description: "Sports interest in hockey | :akkio-ml-ignore |"
+        description: "Sports interest in hockey | :INTERESTS :akkio-ml-ignore |"
       - name: SPORTS_INTERESTS_SOCCER
-        description: "Sports interest in soccer | :akkio-ml-ignore |"
+        description: "Sports interest in soccer | :INTERESTS :akkio-ml-ignore |"
       - name: SPORTS_INTERESTS_TENNIS
-        description: "Sports interest in tennis | :akkio-ml-ignore |"
+        description: "Sports interest in tennis | :INTERESTS :akkio-ml-ignore |"
       - name: SPORTS_INTERESTS_SNOW
-        description: "Sports interest in snow sports | :akkio-ml-ignore |"
+        description: "Sports interest in snow sports | :INTERESTS :akkio-ml-ignore |"
       - name: SPORTS_INTERESTS_GENERAL
-        description: "General sports interest | :akkio-ml-ignore |"
+        description: "General sports interest | :INTERESTS :akkio-ml-ignore |"
       - name: READING_INTERESTS_AUDIO_BOOKS
-        description: "Reading interest in audio books | :akkio-ml-ignore |"
+        description: "Reading interest in audio books | :INTERESTS :akkio-ml-ignore |"
       - name: READING_INTERESTS_BOOKS
-        description: "Reading interest in books | :akkio-ml-ignore |"
+        description: "Reading interest in books | :INTERESTS :akkio-ml-ignore |"
       - name: READING_INTERESTS_DIGITAL_MAGAZINES
-        description: "Reading interest in digital magazines/newspapers | :akkio-ml-ignore |"
+        description: "Reading interest in digital magazines/newspapers | :INTERESTS :akkio-ml-ignore |"
       - name: READING_INTERESTS_EBOOKS
-        description: "Reading interest in e-books | :akkio-ml-ignore |"
+        description: "Reading interest in e-books | :INTERESTS :akkio-ml-ignore |"
       - name: TRAVEL_INTERESTS_AMUSEMENT_PARKS
-        description: "Travel interest in amusement parks | :akkio-ml-ignore |"
+        description: "Travel interest in amusement parks | :INTERESTS :akkio-ml-ignore |"
       - name: TRAVEL_INTERESTS_BOATING
-        description: "Travel interest in boating | :akkio-ml-ignore |"
+        description: "Travel interest in boating | :INTERESTS :akkio-ml-ignore |"
       - name: TRAVEL_INTERESTS_CANOEING
-        description: "Travel interest in canoeing/kayaking | :akkio-ml-ignore |"
+        description: "Travel interest in canoeing/kayaking | :INTERESTS :akkio-ml-ignore |"
       - name: TRAVEL_INTERESTS_DISNEY
-        description: "Travel interest in Disney | :akkio-ml-ignore |"
+        description: "Travel interest in Disney | :INTERESTS :akkio-ml-ignore |"
       - name: TRAVEL_INTERESTS_FISHING
-        description: "Travel interest in fishing | :akkio-ml-ignore |"
+        description: "Travel interest in fishing | :INTERESTS :akkio-ml-ignore |"
       - name: TRAVEL_INTERESTS_HEAVY_TRAVEL
-        description: "Travel interest in heavy travel | :akkio-ml-ignore |"
+        description: "Travel interest in heavy travel | :INTERESTS :akkio-ml-ignore |"
       - name: TRAVEL_INTERESTS_TRAVEL_REWARDS
-        description: "Travel interest in travel rewards | :akkio-ml-ignore |"
+        description: "Travel interest in travel rewards | :INTERESTS :akkio-ml-ignore |"
       - name: TRAVEL_INTERESTS_ZOO
-        description: "Travel interest in zoo visits | :akkio-ml-ignore |"
+        description: "Travel interest in zoo visits | :INTERESTS :akkio-ml-ignore |"
       - name: MAKE
         description: "Vehicle make (placeholder - not available in source) | :akkio-ml-ignore |"
       - name: VEHICLE_STYLE
@@ -148,189 +148,189 @@ models:
       - name: VEHICLE_CLASS
         description: "Vehicle class (placeholder - not available in source) | :akkio-ml-ignore |"
       - name: CREDIT_CARD_INFO_CREDIT_CARD_USER
-        description: "Credit card user indicator | :akkio-ml-ignore |"
+        description: "Credit card user indicator | :FINANCIAL :akkio-ml-ignore |"
       - name: CREDIT_CARD_INFO_MAJOR_CC_USER
-        description: "Major credit card user indicator | :akkio-ml-ignore |"
+        description: "Major credit card user indicator | :FINANCIAL :akkio-ml-ignore |"
       - name: CREDIT_CARD_INFO_PREMIUM_CC_USER
-        description: "Premium credit card user indicator | :akkio-ml-ignore |"
+        description: "Premium credit card user indicator | :FINANCIAL :akkio-ml-ignore |"
       - name: CREDIT_CARD_INFO_STORE_CC_USER
-        description: "Store credit card user indicator | :akkio-ml-ignore |"
+        description: "Store credit card user indicator | :FINANCIAL :akkio-ml-ignore |"
       - name: CREDIT_CARD_INFO_AMEX_USER
-        description: "American Express card user indicator | :akkio-ml-ignore |"
+        description: "American Express card user indicator | :FINANCIAL :akkio-ml-ignore |"
       - name: CREDIT_CARD_INFO_DISCOVER_USER
-        description: "Discover card user indicator | :akkio-ml-ignore |"
+        description: "Discover card user indicator | :FINANCIAL :akkio-ml-ignore |"
       - name: CREDIT_CARD_INFO_MASTERCARD_USER
-        description: "Mastercard user indicator | :akkio-ml-ignore |"
+        description: "Mastercard user indicator | :FINANCIAL :akkio-ml-ignore |"
       - name: CREDIT_CARD_INFO_VISA_SIGNATURE
-        description: "Visa Signature card user indicator | :akkio-ml-ignore |"
+        description: "Visa Signature card user indicator | :FINANCIAL :akkio-ml-ignore |"
       - name: INVESTMENT_TYPE_ACTIVE_INVESTOR
-        description: "Active investor indicator | :akkio-ml-ignore |"
+        description: "Active investor indicator | :FINANCIAL :akkio-ml-ignore |"
       - name: INVESTMENT_TYPE_BROKERAGE_ACCOUNT
-        description: "Brokerage account owner indicator | :akkio-ml-ignore |"
+        description: "Brokerage account owner indicator | :FINANCIAL :akkio-ml-ignore |"
       - name: INVESTMENT_TYPE_RETIREMENT_PLAN
-        description: "Retirement/financial plan holder indicator | :akkio-ml-ignore |"
+        description: "Retirement/financial plan holder indicator | :FINANCIAL :akkio-ml-ignore |"
       - name: INVESTMENT_TYPE_MUTUAL_FUND
-        description: "Mutual fund investor indicator | :akkio-ml-ignore |"
+        description: "Mutual fund investor indicator | :FINANCIAL :akkio-ml-ignore |"
       - name: INVESTMENT_TYPE_ONLINE_TRADING
-        description: "Online trading participant indicator | :akkio-ml-ignore |"
-      - name: STATE_ABBR
-        description: "State abbreviation | :upper |"
+        description: "Online trading participant indicator | :FINANCIAL :akkio-ml-ignore |"
+      - name: STATE
+        description: "State abbreviation | :GEOGRAPHY :upper |"
       - name: ZIP_CODE
-        description: "ZIP code"
+        description: "ZIP code | :GEOGRAPHY |"
       - name: CITY
-        description: "City name | :lower :space-to-hyphen"
+        description: "City name | :GEOGRAPHY :lower :space-to-hyphen |"
       - name: COUNTY_NAME
-        description: "County name | :lower :space-to-hyphen"
+        description: "County name | :GEOGRAPHY :lower :space-to-hyphen |"
       - name: CBSA_CODE
-        description: "5-digit CBSA code (Core Based Statistical Area) | :akkio-ml-ignore |"
+        description: "5-digit CBSA code (Core Based Statistical Area) | :GEOGRAPHY :akkio-ml-ignore |"
       - name: CBSA_TYPE
-        description: "CBSA type: A=Metro CBSA, B=Micro CBSA, C=Not in CBSA | :akkio-ml-ignore |"
+        description: "CBSA type: A=Metro CBSA, B=Micro CBSA, C=Not in CBSA | :GEOGRAPHY :akkio-ml-ignore |"
       - name: METRO_FLAG
-        description: "Metro area flag: Y=Metro Area, N=Not Metro Area | :akkio-ml-ignore |"
+        description: "Metro area flag: Y=Metro Area, N=Not Metro Area | :GEOGRAPHY :akkio-ml-ignore |"
       - name: MARKET_AREA_TYPE
-        description: "Market area type: METRO, MICRO, RURAL, or UNKNOWN | :akkio-ml-ignore |"
+        description: "Market area type: METRO, MICRO, RURAL, or UNKNOWN | :GEOGRAPHY :akkio-ml-ignore |"
       - name: MEDIA_CABLE_TV_HIGH_SPEND
-        description: "High spender on cable TV | :akkio-ml-ignore |"
+        description: "High spender on cable TV | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_AUDIO_HIGH_SPEND
-        description: "High spender on audio services | :akkio-ml-ignore |"
+        description: "High spender on audio services | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_VIDEO_HIGH_SPEND
-        description: "High spender on video services | :akkio-ml-ignore |"
+        description: "High spender on video services | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_CORD_CUTTERS_RECENT
-        description: "Recent cord cutter indicator | :akkio-ml-ignore |"
+        description: "Recent cord cutter indicator | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_BRAND_COMCAST
-        description: "Comcast TV brand indicator | :akkio-ml-ignore |"
+        description: "Comcast TV brand indicator | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_BRAND_DIRECTV
-        description: "DirecTV brand indicator | :akkio-ml-ignore |"
+        description: "DirecTV brand indicator | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_BRAND_DISH
-        description: "Dish Network brand indicator | :akkio-ml-ignore |"
+        description: "Dish Network brand indicator | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_BRAND_SPECTRUM
-        description: "Spectrum TV brand indicator | :akkio-ml-ignore |"
+        description: "Spectrum TV brand indicator | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_BRAND_XFINITY
-        description: "Xfinity TV brand indicator | :akkio-ml-ignore |"
+        description: "Xfinity TV brand indicator | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_AUDIO_BRAND_PANDORA
-        description: "Pandora audio streaming service indicator | :akkio-ml-ignore |"
+        description: "Pandora audio streaming service indicator | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_AUDIO_BRAND_SIRIUS_XM
-        description: "Sirius XM audio streaming service indicator | :akkio-ml-ignore |"
+        description: "Sirius XM audio streaming service indicator | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_AUDIO_BRAND_SPOTIFY
-        description: "Spotify audio streaming service indicator | :akkio-ml-ignore |"
+        description: "Spotify audio streaming service indicator | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_VIDEO_BRAND_HBO
-        description: "HBO video streaming service indicator | :akkio-ml-ignore |"
+        description: "HBO video streaming service indicator | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_VIDEO_BRAND_HULU
-        description: "Hulu video streaming service indicator | :akkio-ml-ignore |"
+        description: "Hulu video streaming service indicator | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_VIDEO_BRAND_NETFLIX
-        description: "Netflix video streaming service indicator | :akkio-ml-ignore |"
+        description: "Netflix video streaming service indicator | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_VIDEO_BRAND_SLING_TV
-        description: "Sling TV video streaming service indicator | :akkio-ml-ignore |"
+        description: "Sling TV video streaming service indicator | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_VIDEO_BRAND_VUDU
-        description: "Vudu video streaming service indicator | :akkio-ml-ignore |"
+        description: "Vudu video streaming service indicator | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_HORROR
-        description: "TV/movie preference for horror content | :akkio-ml-ignore |"
+        description: "TV/movie preference for horror content | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_COMEDY
-        description: "TV/movie preference for comedy content | :akkio-ml-ignore |"
+        description: "TV/movie preference for comedy content | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_DRAMA
-        description: "TV/movie preference for drama content | :akkio-ml-ignore |"
+        description: "TV/movie preference for drama content | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_DRAMA_MOVIES
-        description: "TV/movie preference for drama movies | :akkio-ml-ignore |"
+        description: "TV/movie preference for drama movies | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_ADVENTURE
-        description: "TV/movie preference for adventure content | :akkio-ml-ignore |"
+        description: "TV/movie preference for adventure content | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_FAMILY_FILMS
-        description: "TV/movie preference for family films | :akkio-ml-ignore |"
+        description: "TV/movie preference for family films | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_ROMANTIC_COMEDY
-        description: "TV/movie preference for romantic comedy | :akkio-ml-ignore |"
+        description: "TV/movie preference for romantic comedy | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_SCIFI
-        description: "TV/movie preference for science fiction | :akkio-ml-ignore |"
+        description: "TV/movie preference for science fiction | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_THRILLER
-        description: "TV/movie preference for thriller content | :akkio-ml-ignore |"
+        description: "TV/movie preference for thriller content | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_DOCU_FOREIGN
-        description: "TV/movie preference for documentary/foreign films | :akkio-ml-ignore |"
+        description: "TV/movie preference for documentary/foreign films | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_CULT_CLASSIC
-        description: "TV/movie preference for cult classics | :akkio-ml-ignore |"
+        description: "TV/movie preference for cult classics | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_REALITY_TV
-        description: "TV/movie preference for reality TV | :akkio-ml-ignore |"
+        description: "TV/movie preference for reality TV | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_GAME_SHOWS
-        description: "TV/movie preference for game shows | :akkio-ml-ignore |"
+        description: "TV/movie preference for game shows | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_TV_NEWS
-        description: "TV/movie preference for TV news | :akkio-ml-ignore |"
+        description: "TV/movie preference for TV news | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_TV_ANIMATION
-        description: "TV/movie preference for animation | :akkio-ml-ignore |"
+        description: "TV/movie preference for animation | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_TV_HISTORY
-        description: "TV/movie preference for history content | :akkio-ml-ignore |"
+        description: "TV/movie preference for history content | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_TV_HOW_TO
-        description: "TV/movie preference for how-to content | :akkio-ml-ignore |"
+        description: "TV/movie preference for how-to content | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_TV_MOV
-        description: "TV/movie preference indicator | :akkio-ml-ignore |"
+        description: "TV/movie preference indicator | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_OSCARS
-        description: "TV/movie preference for Oscars viewing | :akkio-ml-ignore |"
+        description: "TV/movie preference for Oscars viewing | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_GRAMMY
-        description: "TV/movie preference for Grammy viewing | :akkio-ml-ignore |"
+        description: "TV/movie preference for Grammy viewing | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_SUMMER_OLYMPICS
-        description: "TV/movie preference for Summer Olympics viewing | :akkio-ml-ignore |"
+        description: "TV/movie preference for Summer Olympics viewing | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_WINTER_OLYMPICS
-        description: "TV/movie preference for Winter Olympics viewing | :akkio-ml-ignore |"
+        description: "TV/movie preference for Winter Olympics viewing | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_MOVIE_OPENING
-        description: "TV/movie preference for movie openings | :akkio-ml-ignore |"
+        description: "TV/movie preference for movie openings | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_OSCARS_FASHION
-        description: "TV/movie preference for Oscars fashion | :akkio-ml-ignore |"
+        description: "TV/movie preference for Oscars fashion | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_COLLEGE_BASKETBALL
-        description: "TV/movie preference for college basketball | :akkio-ml-ignore |"
+        description: "TV/movie preference for college basketball | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_COLLEGE_FOOTBALL
-        description: "TV/movie preference for college football | :akkio-ml-ignore |"
+        description: "TV/movie preference for college football | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_TENNIS
-        description: "TV/movie preference for tennis | :akkio-ml-ignore |"
+        description: "TV/movie preference for tennis | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_HBO_WATCHER
-        description: "TV/movie preference for HBO content | :akkio-ml-ignore |"
+        description: "TV/movie preference for HBO content | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_REDBOX
-        description: "TV/movie preference for Redbox | :akkio-ml-ignore |"
+        description: "TV/movie preference for Redbox | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_STREAMING
-        description: "TV/movie preference for streaming content | :akkio-ml-ignore |"
+        description: "TV/movie preference for streaming content | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_FEMALE_TV
-        description: "TV/movie preference for female-focused TV | :akkio-ml-ignore |"
+        description: "TV/movie preference for female-focused TV | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_GUY_SHOWS
-        description: "TV/movie preference for male-focused shows | :akkio-ml-ignore |"
+        description: "TV/movie preference for male-focused shows | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_OPRAH_FAN
-        description: "TV/movie preference for Oprah content | :akkio-ml-ignore |"
+        description: "TV/movie preference for Oprah content | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_FREQUENT_MOVIE
-        description: "TV/movie preference for frequent movie viewing | :akkio-ml-ignore |"
+        description: "TV/movie preference for frequent movie viewing | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_DISCOVERY_HISTORY
-        description: "TV/movie preference for Discovery/History channel content | :akkio-ml-ignore |"
+        description: "TV/movie preference for Discovery/History channel content | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_TV_MOV_TOP_CHEF
-        description: "TV/movie preference for Top Chef content | :akkio-ml-ignore |"
+        description: "TV/movie preference for Top Chef content | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_MUSIC_80S
-        description: "Music preference for 80s music | :akkio-ml-ignore |"
+        description: "Music preference for 80s music | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_MUSIC_ALTERNATIVE
-        description: "Music preference for alternative music | :akkio-ml-ignore |"
+        description: "Music preference for alternative music | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_MUSIC_CHRISTIAN
-        description: "Music preference for Christian music | :akkio-ml-ignore |"
+        description: "Music preference for Christian music | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_MUSIC_CLASSICAL
-        description: "Music preference for classical music | :akkio-ml-ignore |"
+        description: "Music preference for classical music | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_MUSIC_COUNTRY
-        description: "Music preference for country music | :akkio-ml-ignore |"
+        description: "Music preference for country music | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_MUSIC_HIP_HOP
-        description: "Music preference for hip hop music | :akkio-ml-ignore |"
+        description: "Music preference for hip hop music | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_MUSIC_JAZZ
-        description: "Music preference for jazz music | :akkio-ml-ignore |"
+        description: "Music preference for jazz music | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_MUSIC_OLDIES
-        description: "Music preference for oldies music | :akkio-ml-ignore |"
+        description: "Music preference for oldies music | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_MUSIC_POP
-        description: "Music preference for pop music | :akkio-ml-ignore |"
+        description: "Music preference for pop music | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_MUSIC_ROCK
-        description: "Music preference for rock music | :akkio-ml-ignore |"
+        description: "Music preference for rock music | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_MUSIC_GENERAL
-        description: "General music listening preference | :akkio-ml-ignore |"
+        description: "General music listening preference | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_MUSIC_DOWNLOAD
-        description: "Music preference for downloading music | :akkio-ml-ignore |"
+        description: "Music preference for downloading music | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_MUSIC_STREAMING
-        description: "Music preference for streaming music | :akkio-ml-ignore |"
+        description: "Music preference for streaming music | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_ONLINE_WATCH_TV_MOVIES
-        description: "Online TV/movie watching preference | :akkio-ml-ignore |"
+        description: "Online TV/movie watching preference | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_VIDEO_GAMER
-        description: "Video gaming interest indicator | :akkio-ml-ignore |"
+        description: "Video gaming interest indicator | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_POLITICAL_TV_CONSERVATIVE
-        description: "Political TV viewing preference for conservative content | :akkio-ml-ignore |"
+        description: "Political TV viewing preference for conservative content | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_POLITICAL_TV_LIBERAL
-        description: "Political TV viewing preference for liberal content | :akkio-ml-ignore |"
+        description: "Political TV viewing preference for liberal content | :INTERESTS :akkio-ml-ignore |"
       - name: MEDIA_POLITICAL_TV_LIBERAL_COMEDY
-        description: "Political TV viewing preference for liberal comedy content | :akkio-ml-ignore |"
+        description: "Political TV viewing preference for liberal comedy content | :INTERESTS :akkio-ml-ignore |"
   
   - name: fact_transaction_enriched
     description: >
