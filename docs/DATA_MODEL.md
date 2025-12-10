@@ -1,3 +1,33 @@
+## Data Model Architecture Overview
+
+This data model implements a **star schema** architecture optimized for analytics and RAG (Retrieval-Augmented Generation) queries. The model separates **individual demographic attributes** from **transaction facts**, connected via `AKKIO_ID` for flexible querying.
+
+### Architecture Layers
+
+1. **Source Layer**: Raw source tables from `DEMO.AFS_POC` schema
+2. **Dimension Layer**: Normalized individual attributes (`V_AKKIO_ATTRIBUTES_LATEST`)
+3. **Fact Layer**: Transaction facts at detail (`FACT_TRANSACTION_ENRICHED`) and summary (`FACT_TRANSACTION_SUMMARY`) levels
+4. **Aggregation Layer**: Pre-aggregated views for analytics (`V_AGG_AKKIO_IND`, `V_AGG_AKKIO_HH`, `V_AGG_AKKIO_IND_MEDIA`)
+
+### Key Design Principles
+
+- **Separation of Concerns**: Demographics and transactions are kept separate for optimal query performance
+- **Denormalization**: Transaction facts are denormalized with merchant, brand, and location attributes
+- **Incremental Processing**: Fact tables use incremental materialization for efficient updates
+- **Query Optimization**: Summary tables pre-aggregate data for common analytics patterns
+- **Normalized Attributes**: All demographic fields use consistent, normalized values
+
+### Model Summary Table
+
+| Model Name | Type | Grain (Primary Key) | Materialization | Purpose |
+|------------|------|---------------------|------------------|---------|
+| `V_AKKIO_ATTRIBUTES_LATEST` | Dimension | `AKKIO_ID` | Table | Individual demographic attributes (800+ fields) |
+| `FACT_TRANSACTION_ENRICHED` | Fact | `txid` | Incremental Table | Transaction-level detail with merchant/brand attributes |
+| `FACT_TRANSACTION_SUMMARY` | Fact | `(trans_date, AKKIO_ID)` | Incremental Table | Daily transaction summaries (preferred for most queries) |
+| `V_AGG_AKKIO_IND` | Aggregation | `(AKKIO_ID, PARTITION_DATE)` | Table | Individual-level aggregated demographics for analytics |
+| `V_AGG_AKKIO_HH` | Aggregation | `(PARTITION_DATE, AKKIO_HH_ID)` | Table | Household-level aggregated demographics for analytics |
+| `V_AGG_AKKIO_IND_MEDIA` | Aggregation | `(AKKIO_ID, PARTITION_DATE)` | Table | Individual-level media consumption attributes as OBJECTs |
+
 ## Data Model ERD
 
 ### Entity Relationship Diagram
@@ -6,12 +36,12 @@
 erDiagram
     %% Source Tables
     INDIVIDUAL_DEMOGRAPHIC_SPINE ||--|| V_AKKIO_ATTRIBUTES_LATEST : "transforms_to"
-    TRANSACTION ||--o{ FACT_TRANSACTION_ENRICHED : "enriches"
+    TRANSACTION ||--o{ FACT_TRANSACTION_ENRICHED : "base_transaction"
     CARD ||--o{ FACT_TRANSACTION_ENRICHED : "provides_AKKIO_ID"
-    MERCHANT ||--o{ FACT_TRANSACTION_ENRICHED : "enriches"
-    BRAND_TAGGING ||--o{ FACT_TRANSACTION_ENRICHED : "enriches"
-    BRAND_TAXONOMY ||--o{ FACT_TRANSACTION_ENRICHED : "enriches"
-    BRAND_LOCATION ||--o{ FACT_TRANSACTION_ENRICHED : "enriches"
+    MERCHANT ||--o{ FACT_TRANSACTION_ENRICHED : "merchant_details"
+    BRAND_TAGGING ||--o{ FACT_TRANSACTION_ENRICHED : "brand_tagging"
+    BRAND_TAXONOMY ||--o{ FACT_TRANSACTION_ENRICHED : "brand_taxonomy"
+    BRAND_LOCATION ||--o{ FACT_TRANSACTION_ENRICHED : "store_location"
     TRANSACTION }o--|| CARD : "uses"
     TRANSACTION }o--|| MERCHANT : "at"
     TRANSACTION }o--o{ BRAND_TAGGING : "tagged_as"
@@ -19,10 +49,11 @@ erDiagram
     BRAND_TAGGING }o--|| BRAND_LOCATION : "located_at"
     
     %% dbt Model Relationships
-    V_AKKIO_ATTRIBUTES_LATEST ||--o{ FACT_TRANSACTION_ENRICHED : "has"
-    FACT_TRANSACTION_ENRICHED ||--|| FACT_TRANSACTION_SUMMARY : "aggregates_to"
-    V_AKKIO_ATTRIBUTES_LATEST ||--|| V_AGG_AKKIO_IND : "aggregates_to"
-    V_AKKIO_ATTRIBUTES_LATEST ||--|| V_AGG_AKKIO_HH : "aggregates_to"
+    V_AKKIO_ATTRIBUTES_LATEST ||--o{ FACT_TRANSACTION_ENRICHED : "has_transactions"
+    FACT_TRANSACTION_ENRICHED }o--|| FACT_TRANSACTION_SUMMARY : "aggregates_to"
+    V_AKKIO_ATTRIBUTES_LATEST ||--o{ V_AGG_AKKIO_IND : "aggregates_to"
+    V_AKKIO_ATTRIBUTES_LATEST ||--o{ V_AGG_AKKIO_HH : "aggregates_to"
+    V_AKKIO_ATTRIBUTES_LATEST ||--o{ V_AGG_AKKIO_IND_MEDIA : "aggregates_to"
     
     %% Source Table Definitions
     INDIVIDUAL_DEMOGRAPHIC_SPINE {
@@ -264,6 +295,17 @@ erDiagram
         object MEDIAN_HOME_VALUE_BY_STATE
         int HH_WEIGHT
     }
+    
+    V_AGG_AKKIO_IND_MEDIA {
+        string AKKIO_ID PK
+        date PARTITION_DATE PK
+        object APP_SERVICES_USED
+        object NETWORKS_WATCHED
+        object INPUT_DEVICES_USED
+        object GENRES_WATCHED
+        object TITLES_WATCHED
+        int INSCAPE_WEIGHT
+    }
 ```
 
 ### Source Table Relationships (Data Lineage)
@@ -283,10 +325,11 @@ erDiagram
 
 ### dbt Model Relationships
 
-- **V_AKKIO_ATTRIBUTES_LATEST** (1) ──────< (N) **FACT_TRANSACTION_ENRICHED**: One individual can have many transactions
-- **FACT_TRANSACTION_ENRICHED** (N) ──────> (1) **FACT_TRANSACTION_SUMMARY**: Many transaction detail rows aggregate to one daily summary row per individual
-- **V_AKKIO_ATTRIBUTES_LATEST** (1) ──────> (1) **V_AGG_AKKIO_IND**: One individual per PARTITION_DATE aggregates to one individual aggregation row per PARTITION_DATE
-- **V_AKKIO_ATTRIBUTES_LATEST** (1) ──────> (1) **V_AGG_AKKIO_HH**: One individual per PARTITION_DATE aggregates to one household aggregation row per PARTITION_DATE (currently 1:1, structured for future household scenarios)
+- **V_AKKIO_ATTRIBUTES_LATEST** (1) ──────< (N) **FACT_TRANSACTION_ENRICHED**: One individual (`AKKIO_ID`) can have many transactions. Join key: `AKKIO_ID`
+- **FACT_TRANSACTION_ENRICHED** (N) ──────> (1) **FACT_TRANSACTION_SUMMARY**: Many transaction detail rows aggregate to one daily summary row per individual. Grain: `(trans_date, AKKIO_ID)`
+- **V_AKKIO_ATTRIBUTES_LATEST** (1) ──────> (1) **V_AGG_AKKIO_IND**: One individual per `PARTITION_DATE` aggregates to one individual aggregation row per `PARTITION_DATE`. Grain: `(AKKIO_ID, PARTITION_DATE)`
+- **V_AKKIO_ATTRIBUTES_LATEST** (1) ──────> (1) **V_AGG_AKKIO_HH**: One individual per `PARTITION_DATE` aggregates to one household aggregation row per `PARTITION_DATE`. Grain: `(PARTITION_DATE, AKKIO_HH_ID)`. Currently 1:1 since `AKKIO_HH_ID = AKKIO_ID`, but structured for future household scenarios
+- **V_AKKIO_ATTRIBUTES_LATEST** (1) ──────> (1) **V_AGG_AKKIO_IND_MEDIA**: One individual per `PARTITION_DATE` aggregates to one media aggregation row per `PARTITION_DATE`. Grain: `(AKKIO_ID, PARTITION_DATE)`
 
 ### Data Model Notes
 
@@ -295,23 +338,40 @@ erDiagram
 - **V_AKKIO_ATTRIBUTES_LATEST**: Individual Attributes Dimension - One row per individual with all normalized demographic attributes. Primary key is `AKKIO_ID` (formerly `afs_individual_id`). Contains 800+ demographic attributes with normalized values for gender, ethnicity, politics, income, net worth, financial health, occupation, interests (general, sports, reading, travel), credit card info, investment types, and media consumption preferences. Generated from `INDIVIDUAL_DEMOGRAPHIC_SPINE` source table. Includes household composition fields (NUMBER_OF_CHILDREN, PRESENCE_OF_CHILDREN, CHILD_AGE_GROUP, etc.).
 
 - **FACT_TRANSACTION_ENRICHED**: Detail Transaction Fact Table - Denormalized transaction table with `AKKIO_ID` for easy joining to attributes table. Contains granular detail about each individual transaction. Built by joining 6 source tables:
+  - **Primary Key**: `txid` (one row per transaction)
+  - **Foreign Key**: `AKKIO_ID` (used to join to `V_AKKIO_ATTRIBUTES_LATEST`). Note: `AKKIO_ID` is not part of the primary key because one individual can have many transactions.
   - **TRANSACTION** (base table): Transaction facts (txid, trans_date, trans_time, trans_amount, etc.)
   - **CARD** (LEFT JOIN on `membccid`): Provides `AKKIO_ID` via `afs_individual_id`, plus card attributes
   - **MERCHANT** (LEFT JOIN on `mtid`): Provides merchant description, MCC, and location
   - **BRAND_TAGGING** (LEFT JOIN on `mtid`): Provides store_id, brand_id, channel, and locationid
   - **BRAND_TAXONOMY** (LEFT JOIN on `store_id` + `brand_id`): Provides store/brand names and classifications
   - **BRAND_LOCATION** (LEFT JOIN on `locationid`): Provides store address and location details
+  - **Grain**: One row per transaction (`txid`)
   - **Materialization**: Incremental table (clustered by trans_date, AKKIO_ID)
   - **Note**: Use `FACT_TRANSACTION_SUMMARY` for most queries unless transaction-level detail is required
 
-- **FACT_TRANSACTION_SUMMARY**: Daily Transaction Summary Table - Aggregated transaction activity per day and individual (`trans_date`, `AKKIO_ID`). Optimized for RAG engine queries that need summary-level data. Contains transaction metrics (count, totals, averages), aggregated merchant/brand attributes as comma-separated lists, and unique counts. Source: `FACT_TRANSACTION_ENRICHED`.
-  - **Grain**: One row per day per individual (trans_date, AKKIO_ID)
-  - **Materialization**: Table (clustered by trans_date, AKKIO_ID)
+- **FACT_TRANSACTION_SUMMARY**: Daily Transaction Summary Table - Aggregated transaction activity per day and individual (`trans_date`, `AKKIO_ID`). Optimized for RAG engine queries that need summary-level data. Contains transaction metrics (count, totals, averages), aggregated merchant/brand attributes as comma-separated lists, and unique counts. Generated from `FACT_TRANSACTION_ENRICHED` via aggregation.
+  - **Grain**: One row per day per individual (`trans_date`, `AKKIO_ID`)
+  - **Materialization**: Incremental table (clustered by `trans_date`, `AKKIO_ID`)
   - **Use Case**: Preferred table for most analytics queries; use `FACT_TRANSACTION_ENRICHED` only when transaction-level detail is needed
+  - **Key Features**: Pre-aggregated strings only when count > 1 (reduces storage), uses NULL instead of empty strings for cleaner data
 
 - **V_AGG_AKKIO_IND**: Individual Aggregation Table - One row per individual (`AKKIO_ID`) per `PARTITION_DATE` with aggregated demographic attributes optimized for analytics. Generated from `V_AKKIO_ATTRIBUTES_LATEST`. Includes contact identifier placeholders (MAIDS, IPS, EMAILS, PHONES), interests as OBJECTs (GENERAL_INTERESTS, SPORTS_INTERESTS, READING_INTERESTS, TRAVEL_INTERESTS), credit card info as OBJECT, and financial attributes. Age buckets are encoded as integers (1-7 for AGE_BUCKET, 1-12 for AGE_BUCKET_DETAILED).
+  - **Grain**: One row per individual per `PARTITION_DATE` (`AKKIO_ID`, `PARTITION_DATE`)
+  - **Materialization**: Table (clustered by `PARTITION_DATE`, `AKKIO_ID`)
 
 - **V_AGG_AKKIO_HH**: Household Aggregation Table - One row per household (`AKKIO_HH_ID`) per `PARTITION_DATE` with household-level attributes. Generated from `V_AKKIO_ATTRIBUTES_LATEST`. Includes household income, child age groups as OBJECT, homeowner status as integer (0/1), and household composition metrics. Currently 1:1 with individuals but structured for future scenarios where multiple individuals may share a household.
+  - **Grain**: One row per household per `PARTITION_DATE` (`PARTITION_DATE`, `AKKIO_HH_ID`)
+  - **Materialization**: Table (clustered by `PARTITION_DATE`, `AKKIO_HH_ID`)
+
+- **V_AGG_AKKIO_IND_MEDIA**: Individual Media Aggregation Table - One row per individual (`AKKIO_ID`) per `PARTITION_DATE` with media consumption attributes aggregated into OBJECT columns. Generated from `V_AKKIO_ATTRIBUTES_LATEST`. Optimized for media analytics queries. Includes:
+  - **APP_SERVICES_USED**: Video streaming services (Netflix, Hulu, HBO Max, Sling TV, Vudu) as OBJECT
+  - **NETWORKS_WATCHED**: TV/Cable providers (Comcast, DirecTV, Dish Network, Spectrum, Xfinity) as OBJECT
+  - **INPUT_DEVICES_USED**: Audio streaming services (Pandora, Sirius XM, Spotify) as OBJECT
+  - **GENRES_WATCHED**: TV/movie genres and music genres as OBJECT
+  - **TITLES_WATCHED**: Content preferences (horror, comedy, drama, HBO content, Oscars, etc.) as OBJECT
+  - **Grain**: One row per individual per `PARTITION_DATE` (`AKKIO_ID`, `PARTITION_DATE`)
+  - **Materialization**: Table (clustered by `PARTITION_DATE`, `AKKIO_ID`)
 
 #### Design Principles
 

@@ -5,7 +5,7 @@ models:
   - name: v_akkio_attributes_latest
     description: >
       Individual Attributes Dimension - One row per individual with all demographic attributes
-      | :short-name:v_akkio_attributes_latest: :use_for_audience_gen: |
+      | :short-name:v_akkio_attributes_latest: :use_for_audience_gen:yes: |
 
     columns:
       - name: AKKIO_ID
@@ -335,8 +335,8 @@ models:
   - name: fact_transaction_enriched
     description: >
       Detail Transaction Fact Table - Adds AKKIO_ID to transactions for easy joining to attributes table. Includes merchant, brand, and location attributes.
-      Provides granular detail about each individual transaction.
-      | :short-name:transaction_detail: :use_for_audience_gen:yes: |
+      This provides granular detail about each individual transaction.
+      | :short-name:transaction_detail: :use_for_audience_gen:yes |
       
     columns:
       - name: txid
