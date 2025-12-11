@@ -18,9 +18,9 @@ models:
       - name: PARTITION_DATE
         description: "Activity date (from lu_a_adat in YYYYMMDD format) or current date if not available | :akkio-context-ignore |"
       - name: GENDER
-        description: "Normalized gender: MALE, FEMALE, UNKNOWN, BOTH (Male/Female Pair), or UNDETERMINED | :DEMOGRAPHICS :ml-encoding-nominal |"
+        description: "Normalized gender: MALE, FEMALE, UNKNOWN, BOTH (Male/Female Pair), or UNDETERMINED | :DEMOGRAPHICS :ml-encoding-nominal :audience_preview_data:yes: |"
       - name: AGE
-        description: "Extracted age from combined_age_1 (E25 or I25 format) | :DEMOGRAPHICS |"
+        description: "Extracted age from combined_age_1 (E25 or I25 format) | :DEMOGRAPHICS :audience_preview_data:yes: |"
       - name: AGE_BUCKET
         description: "Age range bucket: 19-24, 25-29, 30-34, 35-39, 40-44, 45-49, 50-54, 55-59, 60+ | :DEMOGRAPHICS :akkio-ml-ignore |"
       - name: YEAR_OF_BIRTH
@@ -32,9 +32,9 @@ models:
       - name: EDUCATION_MODEL
         description: "Education model code | :DEMOGRAPHICS |"
       - name: MARITAL_STATUS
-        description: "Marital status code | :HOUSEHOLDCOMPOSITION |"
+        description: "Marital status code | :HOUSEHOLDCOMPOSITION :audience_preview_data:yes:|"
       - name: HOMEOWNER_STATUS
-        description: "Homeowner status: HOMEOWNER, RENTER, or UNKNOWN | :PROPERTYOWNERSHIP |"
+        description: "Homeowner status: HOMEOWNER, RENTER, or UNKNOWN | :PROPERTYOWNERSHIP :audience_preview_data:yes:|"
       - name: HOUSEHOLD_INCOME_K
         description: "Household income in thousands (001-250, 000=Unknown) | :FINANCIAL |"
       - name: INCOME_BUCKET
@@ -174,7 +174,7 @@ models:
       - name: INVESTMENT_TYPE_ONLINE_TRADING
         description: "Online trading participant indicator | :FINANCIAL :akkio-ml-ignore |"
       - name: STATE
-        description: "State abbreviation | :GEOGRAPHY :upper |"
+        description: "State abbreviation | :GEOGRAPHY :upper :audience_preview_data:yes:|"
       - name: ZIP_CODE
         description: "ZIP code | :GEOGRAPHY |"
       - name: CITY
