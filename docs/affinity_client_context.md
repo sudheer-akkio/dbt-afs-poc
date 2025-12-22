@@ -50,8 +50,35 @@ When building audiences, **always include these core demographic fields by defau
 - `ONLINE` = E-commerce/digital purchases
 - `B&M` = Brick and Mortar (in-store purchases)
 
-### Date Handling
-- For relative time periods ("last month," "past 90 days"), calculate from the maximum date in the dataset, not CURRENT_DATE
+### Date Handling for Transaction Queries
+
+**Primary Date Column:** Always use `TRANS_DATE` as the key date field when filtering or analyzing transactions in `FACT_TRANSACTION_ENRICHED`.
+
+#### Absolute Date Ranges (Specific Periods)
+When a prompt specifies a concrete time period (e.g., "in June 2025", "from July to September 2025"):
+- Use explicit date boundaries with `>=` for the start date and `<` for the day after the end date
+- Example: "June 2025" → `TRANS_DATE >= '2025-06-01' AND TRANS_DATE < '2025-07-01'`
+- Example: "July to September 2025" → `TRANS_DATE >= '2025-07-01' AND TRANS_DATE < '2025-10-01'`
+
+#### Relative Date Ranges (Rolling Periods)
+When a prompt uses relative time references (e.g., "last 2 months", "past 90 days", "last month"):
+- **NEVER use `CURRENT_DATE` or `GETDATE()`** — the dataset may not be current
+- **ALWAYS derive from `MAX(TRANS_DATE)`** in the dataset to establish the reference point
+- Use a CTE to calculate the maximum date, then reference it for date math:
+  ```sql
+  MAX_DATE_CTE AS (
+    SELECT MAX(TRANS_DATE) AS MAX_DATE
+    FROM FACT_TRANSACTION_ENRICHED
+  )
+  ```
+- Use `DATEADD()` for relative calculations against the max date (e.g., `DATEADD(MONTH, -2, MAX_DATE)`)
+- Cross join or reference the max date CTE in subsequent filtering
+
+#### Multi-Condition Audience Builds
+For complex audience queries combining multiple time-based conditions:
+- Create separate CTEs for each time-based cohort (e.g., "purchased in June", "purchased July-Sept")
+- Use the max date CTE for any relative date references
+- Combine cohorts using set operations (IN, NOT IN, INTERSECT, EXCEPT) to build the final audience
 
 ---
 

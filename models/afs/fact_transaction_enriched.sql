@@ -95,7 +95,7 @@ WHERE t.trans_date IS NOT NULL
         AND t.trans_date > (SELECT MAX(trans_date) FROM {{ this }})
     {% else %}
         -- Full refresh: Last 6 months of data based on trans_date
-        AND t.trans_date >= DATEADD(month, -6, CURRENT_DATE())
+        -- AND t.trans_date >= DATEADD(month, -6, CURRENT_DATE())
     {% endif %}
 
 -- To change the date range, modify the DATEADD function above:
