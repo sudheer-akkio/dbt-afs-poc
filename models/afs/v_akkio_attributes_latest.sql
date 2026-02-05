@@ -378,7 +378,7 @@ SELECT
     CASE
         WHEN ctrl.AKKIO_ID IS NOT NULL THEN 'CONTROL'
         WHEN exposed.AKKIO_ID IS NOT NULL THEN 'EXPOSED'
-        ELSE 'UNKNOWN'
+        ELSE NULL
     END AS EXPERIMENT_GROUP,
     
     -- Interests (from act_int_* fields)

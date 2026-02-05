@@ -418,6 +418,8 @@ models:
         description: "Estimated store open date"
       - name: store_close_date
         description: "Estimated store close date"
+      - name: EXPERIMENT_GROUP
+        description: "Experiment group assignment: CONTROL, EXPOSED, or NULL if not in experiment | :upper"
   
   - name: fact_transaction_summary
     description: >
@@ -438,6 +440,8 @@ models:
         description: "Unique identifier for an individual (Foreign Key to v_akkio_attributes_latest)"
         data_tests:
           - not_null
+      - name: EXPERIMENT_GROUP
+        description: "Experiment group assignment: CONTROL, EXPOSED, or NULL if not in experiment | :upper"
       - name: transaction_count
         description: "Number of transactions for this individual on this date"
         data_tests:

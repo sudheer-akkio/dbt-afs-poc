@@ -36,6 +36,7 @@ distinct_values AS (
     SELECT DISTINCT
         trans_date,
         AKKIO_ID,
+        EXPERIMENT_GROUP,
         merchant_description,
         merchant_category_code,
         merchant_city,
@@ -64,6 +65,8 @@ agg_metrics AS (
     SELECT
         trans_date,
         AKKIO_ID,
+        -- Experiment group (should be same for all transactions of an individual)
+        MAX(EXPERIMENT_GROUP) AS EXPERIMENT_GROUP,
         COUNT(*) AS transaction_count,
         SUM(trans_amount) AS total_transaction_amount,
         AVG(trans_amount) AS avg_transaction_amount,
@@ -201,6 +204,7 @@ array_agg_values AS (
 SELECT
     am.trans_date,
     am.AKKIO_ID,
+    am.EXPERIMENT_GROUP,
     am.transaction_count,
     am.total_transaction_amount,
     am.avg_transaction_amount,

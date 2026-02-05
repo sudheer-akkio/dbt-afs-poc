@@ -13,7 +13,16 @@
 -- Includes merchant, brand, and location attributes
 -- Joins 6 source tables: TRANSACTION, CARD, MERCHANT, BRAND_TAGGING,
 -- BRAND_TAXONOMY, BRAND_LOCATION
+-- Plus ECID_CONTROL_UNLOAD and ECID_EXPOSED_UNLOAD for experiment group
 -- ============================================================================
+
+WITH control_group AS (
+    SELECT DISTINCT AKKIO_ID FROM {{ source('afs_poc', 'ECID_CONTROL_UNLOAD') }}
+),
+
+exposed_group AS (
+    SELECT DISTINCT AKKIO_ID FROM {{ source('afs_poc', 'ECID_EXPOSED_UNLOAD') }}
+)
 
 SELECT 
     -- Transaction Facts
@@ -62,7 +71,14 @@ SELECT
     bl.zip AS store_zip,
     bl.country AS store_country,
     bl.est_open_date AS store_open_date,
-    bl.est_close_date AS store_close_date
+    bl.est_close_date AS store_close_date,
+    
+    -- Experiment Group (CONTROL, EXPOSED, or NULL)
+    CASE
+        WHEN ctrl.AKKIO_ID IS NOT NULL THEN 'CONTROL'
+        WHEN exp.AKKIO_ID IS NOT NULL THEN 'EXPOSED'
+        ELSE NULL
+    END AS EXPERIMENT_GROUP
     
 FROM {{ source('afs_poc', 'TRANSACTION') }} t
 -- Join to Card to get AKKIO_ID
@@ -81,6 +97,11 @@ LEFT JOIN {{ source('afs_poc', 'BRAND_TAXONOMY') }} btax
 -- Join to Brand Location
 LEFT JOIN {{ source('afs_poc', 'BRAND_LOCATION') }} bl 
     ON bt.locationid = bl.locationid
+-- Join to Experiment Groups (Control/Exposed)
+LEFT JOIN control_group ctrl
+    ON c.afs_individual_id = ctrl.AKKIO_ID
+LEFT JOIN exposed_group exp
+    ON c.afs_individual_id = exp.AKKIO_ID
 
 -- ============================================================================
 -- INCREMENTAL LOGIC: Process only new transactions

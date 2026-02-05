@@ -82,6 +82,40 @@ For complex audience queries combining multiple time-based conditions:
 
 ---
 
+## RFM Feature Engineering (Required for Audience Builds)
+
+**ALWAYS include RFM (Recency, Frequency, Monetary) features when building any audience.** Compute these from `FACT_TRANSACTION_ENRICHED` if that source is needed.
+
+### Source Columns
+- `AKKIO_ID` - group by this
+- `trans_date` - for recency/time windows
+- `trans_amount` - for monetary
+- `transaction_channel` - 'ONLINE' or 'B&M'
+
+### RFM SQL Pattern
+
+```sql
+WITH max_date AS (SELECT MAX(trans_date) AS ref_date FROM FACT_TRANSACTION_ENRICHED),
+rfm AS (
+  SELECT AKKIO_ID,
+    MAX(trans_date) AS last_txn_date,
+    DATEDIFF(day, MAX(trans_date), (SELECT ref_date FROM max_date)) AS days_since_last_txn,
+    COUNT(CASE WHEN trans_date >= DATEADD(month, -12, (SELECT ref_date FROM max_date)) THEN 1 END) AS tot_trans_12mo,
+    COUNT(CASE WHEN trans_date >= DATEADD(month, -3, (SELECT ref_date FROM max_date)) THEN 1 END) AS tot_trans_3mo,
+    SUM(CASE WHEN trans_date >= DATEADD(month, -12, (SELECT ref_date FROM max_date)) THEN trans_amount END) AS tot_spend_12mo,
+    SUM(CASE WHEN trans_date >= DATEADD(month, -3, (SELECT ref_date FROM max_date)) THEN trans_amount END) AS tot_spend_3mo,
+    COUNT(CASE WHEN transaction_channel = 'ONLINE' AND trans_date >= DATEADD(month, -12, (SELECT ref_date FROM max_date)) THEN 1 END) AS tot_online_trans_12mo
+  FROM FACT_TRANSACTION_ENRICHED GROUP BY AKKIO_ID
+)
+```
+
+### Time Windows & Interpretation
+- **Windows:** 12mo, 9mo, 6mo, 3mo, 1mo
+- **Trend detection:** `tot_trans_3mo / NULLIF(tot_trans_12mo, 0) > 0.4` = accelerating shopper
+- **Higher** spend/frequency = more engaged; **Lower** days_since_last_txn = more recent
+
+---
+
 ## Synonyms & Terminology
 
 | User Says | Maps To |
