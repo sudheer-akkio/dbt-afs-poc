@@ -15,6 +15,14 @@
 WITH source_data AS (
     SELECT DISTINCT *
     FROM {{ source('afs_poc', 'INDIVIDUAL_DEMOGRAPHIC_SPINE') }}
+),
+
+control_group AS (
+    SELECT * FROM {{ source('afs_poc', 'ECID_CONTROL_UNLOAD') }}
+),
+
+exposed_group AS (
+    SELECT * FROM {{ source('afs_poc', 'ECID_EXPOSED_UNLOAD') }}
 )
 
 SELECT
@@ -366,6 +374,12 @@ SELECT
     
     -- Median Home Value by State (from CAPE2020 data)
     CAST(COALESCE(source_data.c20_cyemhuval, '0') AS INTEGER) AS MEDIAN_HOME_VALUE_BY_STATE,
+
+    CASE
+        WHEN ctrl.AKKIO_ID IS NOT NULL THEN 'CONTROL'
+        WHEN exposed.AKKIO_ID IS NOT NULL THEN 'EXPOSED'
+        ELSE 'UNKNOWN'
+    END AS EXPERIMENT_GROUP,
     
     -- Interests (from act_int_* fields)
     -- General Interests
@@ -526,4 +540,9 @@ SELECT
     source_data.act_int_political_viewing_on_tv_liberal_comedy AS MEDIA_POLITICAL_TV_LIBERAL_COMEDY
     
 FROM source_data
+
+LEFT JOIN control_group ctrl
+    ON source_data.afs_individual_id = ctrl.AKKIO_ID
+LEFT JOIN exposed_group exposed
+    ON source_data.afs_individual_id = exposed.AKKIO_ID
 

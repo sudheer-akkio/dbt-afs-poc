@@ -144,3 +144,14 @@ sources:
           - name: gender
             description: "Individual gender"
 
+      - name: ECID_CONTROL_UNLOAD
+        description: "The list of Akkio IDs in the control group of the exposed - control ids. The exposed group is in the table ECID_EXPOSED_UNLOAD. | :short-name:ecid_control: :use_for_audience_gen:yes: |"
+        columns:
+          - name: AKKIO_ID
+            description: "Unique identifier for an individual (Primary Key)"
+
+      - name: ECID_EXPOSED_UNLOAD
+        description: "The list of Akkio IDs in the exposed group of the exposed - control ids. The control group is in the table ECID_CONTROL_UNLOAD. | :short-name:ecid_control: :use_for_audience_gen:yes: |"
+        columns:
+          - name: AKKIO_ID
+            description: "Unique identifier for an individual (Primary Key)"

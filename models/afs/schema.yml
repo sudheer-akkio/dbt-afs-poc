@@ -63,6 +63,8 @@ models:
         description: "Occupation model code from ocup_model_v2_1 | :EMPLOYMENT :ml-encoding-nominal |"
       - name: MEDIAN_HOME_VALUE_BY_STATE
         description: "Median home value by state from CAPE2020 data | :GEOGRAPHY :akkio-ml-ignore |"
+      - name: EXPERIMENT_GROUP
+        description: "Experiment group: CONTROL, EXPOSED, or UNKNOWN | :akkio-ml-ignore |"
       - name: GENERAL_INTERESTS_ARTS_CRAFTS
         description: "General interest in arts and crafts | :INTERESTS :akkio-ml-ignore |"
       - name: GENERAL_INTERESTS_BOOK_READER
