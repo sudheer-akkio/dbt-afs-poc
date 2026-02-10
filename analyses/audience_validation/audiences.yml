@@ -1,0 +1,47 @@
+# =============================================================================
+# Audience Validation Configuration
+# =============================================================================
+# Add audiences to validate here. Each entry runs the holdout-set validation
+# query and the results are aggregated into a single summary table + CSV.
+#
+# Required fields:
+#   audience_id    - Akkio audience UUID (from AUDIENCE_LOOKUP)
+#   name           - Friendly label for the results table
+#   brand_keywords - List of keywords matched via LIKE against BRAND_NAME,
+#                    STORE_NAME, and MERCHANT_DESCRIPTION (case-insensitive)
+#
+# Optional fields (with defaults shown):
+#   date_start     - Inclusive start of holdout window  (default: 2025-08-01)
+#   date_end       - Exclusive end of holdout window    (default: 2025-10-01)
+#   database       - Snowflake DB for AUDIENCE_LOOKUP   (default: DEMO)
+#   schema         - Snowflake schema for AUDIENCE_LOOKUP (default: AFS_POC)
+#   fact_database  - Snowflake DB for FACT_TRANSACTION_ENRICHED (default: DEMO)
+#   fact_schema    - Snowflake schema for FACT_TRANSACTION_ENRICHED (default: AFS_POC)
+# =============================================================================
+
+# -- Global defaults (apply to all audiences unless overridden) ---------------
+defaults:
+  date_start: "2025-08-01"
+  date_end: "2025-10-01"
+  database: "DEMO"
+  schema: "AFS_POC"
+  fact_database: "DEMO"
+  fact_schema: "AFS_POC"
+
+# -- Audiences to validate ----------------------------------------------------
+audiences:
+  - audience_id: "akkio_audience_16bf9863_42f3_4ed1_bcbe_b6b8ec937144"
+    name: "ActBlue Lookalike Prospects"
+    brand_keywords:
+      - "ACTBLUE"
+
+  - audience_id: "akkio_audience_ae4c3b2a_23d9_4848_aa54_29060b2bedaa"
+    name: "ActBlue Lookalike Prospects - Refined"
+    brand_keywords:
+      - "ACTBLUE"
+
+  # - audience_id: "akkio_audience_XXXXXXXX_XXXX_XXXX_XXXX_XXXXXXXXXXXX"
+  #   name: "Another Brand"
+  #   brand_keywords:
+  #     - "KEYWORD1"
+  #     - "KEYWORD2"

@@ -5,6 +5,9 @@ dbt_packages/
 logs/
 sandbox/
 
+# Validation output (generated CSVs)
+analyses/audience_validation/output/
+
 # Virtual Environment
 venv/
 env/
