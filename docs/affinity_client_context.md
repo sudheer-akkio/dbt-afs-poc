@@ -82,30 +82,70 @@ For complex audience queries combining multiple time-based conditions:
 
 ---
 
+## Data Sources
+
+### Core Tables
+
+| Table | Purpose |
+|-------|---------|
+| `FACT_TRANSACTION_ENRICHED` | Transaction-level data with AKKIO_ID, TRANS_DATE, TRANS_AMOUNT, TRANSACTION_CHANNEL, BRAND_NAME, STORE_NAME, MERCHANT_DESCRIPTION, etc. |
+| `V_AKKIO_ATTRIBUTES_LATEST` | Demographic and behavioral profile per AKKIO_ID (demographics, interests, propensities). Contains the core demographic fields listed in Audience Building Defaults. |
+
+### Joining Pattern
+- Use `AKKIO_ID` as the join key across all tables.
+- Identify shoppers from `FACT_TRANSACTION_ENRICHED`, then LEFT JOIN to `V_AKKIO_ATTRIBUTES_LATEST` for their full demographic/behavioral profile.
+
+---
+
+## Brand / Merchant Identification
+
+To identify shoppers of a specific brand or merchant, match against **three columns** in `FACT_TRANSACTION_ENRICHED` using case-insensitive LIKE:
+
+```sql
+UPPER(MERCHANT_DESCRIPTION) LIKE '%<KEYWORD>%'
+OR UPPER(STORE_NAME)        LIKE '%<KEYWORD>%'
+OR UPPER(BRAND_NAME)        LIKE '%<KEYWORD>%'
+```
+
+Replace `<KEYWORD>` with the uppercased brand name (e.g., `ACTBLUE`, `WALMART`, `AMAZON`).
+
+**Multiple keywords:** OR them together. Each keyword generates three LIKE clauses (one per column).
+
+---
+
 ## RFM Feature Engineering (Required for Audience Builds)
 
-**ALWAYS include RFM (Recency, Frequency, Monetary) features when building any audience.** Compute these from `FACT_TRANSACTION_ENRICHED` if that source is needed.
+**ALWAYS include RFM (Recency, Frequency, Monetary) features when building any audience.** Compute these from `FACT_TRANSACTION_ENRICHED`.
 
 ### Source Columns
-- `AKKIO_ID` - group by this
-- `trans_date` - for recency/time windows
-- `trans_amount` - for monetary
-- `transaction_channel` - 'ONLINE' or 'B&M'
+- `AKKIO_ID` — group by this
+- `TRANS_DATE` — for recency / time windows
+- `TRANS_AMOUNT` — for monetary
+- `TRANSACTION_CHANNEL` — 'ONLINE' or 'B&M'
+
+### Date Cutoff Handling
+- When the prompt specifies a **hard cutoff date** (e.g., "through July 31, 2025"), use that date as the reference date for RFM calculations instead of `MAX(TRANS_DATE)`.
+- Filter all transactions to `TRANS_DATE < '<cutoff_day_after>'` (e.g., `< '2025-08-01'`) and set `ref_date` to the cutoff date.
+- When **no cutoff** is specified, derive `ref_date` from `MAX(TRANS_DATE)` as usual.
 
 ### RFM SQL Pattern
 
 ```sql
-WITH max_date AS (SELECT MAX(trans_date) AS ref_date FROM FACT_TRANSACTION_ENRICHED),
+-- ref_date: use the hard cutoff date if specified, otherwise MAX(TRANS_DATE)
+WITH ref AS (SELECT '<cutoff_date>'::DATE AS ref_date),  -- or MAX(TRANS_DATE)
 rfm AS (
   SELECT AKKIO_ID,
-    MAX(trans_date) AS last_txn_date,
-    DATEDIFF(day, MAX(trans_date), (SELECT ref_date FROM max_date)) AS days_since_last_txn,
-    COUNT(CASE WHEN trans_date >= DATEADD(month, -12, (SELECT ref_date FROM max_date)) THEN 1 END) AS tot_trans_12mo,
-    COUNT(CASE WHEN trans_date >= DATEADD(month, -3, (SELECT ref_date FROM max_date)) THEN 1 END) AS tot_trans_3mo,
-    SUM(CASE WHEN trans_date >= DATEADD(month, -12, (SELECT ref_date FROM max_date)) THEN trans_amount END) AS tot_spend_12mo,
-    SUM(CASE WHEN trans_date >= DATEADD(month, -3, (SELECT ref_date FROM max_date)) THEN trans_amount END) AS tot_spend_3mo,
-    COUNT(CASE WHEN transaction_channel = 'ONLINE' AND trans_date >= DATEADD(month, -12, (SELECT ref_date FROM max_date)) THEN 1 END) AS tot_online_trans_12mo
-  FROM FACT_TRANSACTION_ENRICHED GROUP BY AKKIO_ID
+    MAX(TRANS_DATE) AS last_txn_date,
+    DATEDIFF(day, MAX(TRANS_DATE), (SELECT ref_date FROM ref)) AS days_since_last_txn,
+    COUNT(CASE WHEN TRANS_DATE >= DATEADD(month, -12, (SELECT ref_date FROM ref)) THEN 1 END) AS tot_trans_12mo,
+    COUNT(CASE WHEN TRANS_DATE >= DATEADD(month, -3,  (SELECT ref_date FROM ref)) THEN 1 END) AS tot_trans_3mo,
+    SUM(CASE WHEN TRANS_DATE >= DATEADD(month, -12, (SELECT ref_date FROM ref)) THEN TRANS_AMOUNT END) AS tot_spend_12mo,
+    SUM(CASE WHEN TRANS_DATE >= DATEADD(month, -3,  (SELECT ref_date FROM ref)) THEN TRANS_AMOUNT END) AS tot_spend_3mo,
+    COUNT(CASE WHEN TRANSACTION_CHANNEL = 'ONLINE'
+               AND TRANS_DATE >= DATEADD(month, -12, (SELECT ref_date FROM ref)) THEN 1 END) AS tot_online_trans_12mo
+  FROM FACT_TRANSACTION_ENRICHED
+  WHERE TRANS_DATE < '<cutoff_day_after>'  -- omit if no hard cutoff
+  GROUP BY AKKIO_ID
 )
 ```
 
@@ -113,6 +153,17 @@ rfm AS (
 - **Windows:** 12mo, 9mo, 6mo, 3mo, 1mo
 - **Trend detection:** `tot_trans_3mo / NULLIF(tot_trans_12mo, 0) > 0.4` = accelerating shopper
 - **Higher** spend/frequency = more engaged; **Lower** days_since_last_txn = more recent
+
+---
+
+## Standard Audience Extraction Workflow
+
+When asked to build a brand-shopper audience with demographics and RFM features, follow this pattern:
+
+1. **Identify brand shoppers** — CTE that selects distinct `AKKIO_ID` from `FACT_TRANSACTION_ENRICHED` matching the brand keyword(s) (see Brand / Merchant Identification), applying any date filters.
+2. **Compute RFM features** — CTE grouped by `AKKIO_ID` over the same (or specified) date range (see RFM SQL Pattern).
+3. **Join demographics** — LEFT JOIN the brand-shopper set to `V_AKKIO_ATTRIBUTES_LATEST` on `AKKIO_ID` to pull the core demographic fields (see Audience Building Defaults).
+4. **Final SELECT** — Return AKKIO_ID, all core demographic fields, and all RFM features.
 
 ---
 

@@ -32,16 +32,12 @@ from typing import Optional
 import snowflake.connector
 import pandas as pd
 
-# ---------------------------------------------------------------------------
 # Paths — resolve relative to this script's location
-# ---------------------------------------------------------------------------
 SCRIPT_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = SCRIPT_DIR / "audiences.yml"
 OUTPUT_DIR = SCRIPT_DIR / "output"
 
-# ---------------------------------------------------------------------------
 # Logging
-# ---------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -50,10 +46,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-# ===================================================================
 # Data classes
-# ===================================================================
-
 @dataclass
 class AudienceConfig:
     """One audience + brand combination to validate."""
@@ -61,7 +54,7 @@ class AudienceConfig:
     audience_id: str                     # Akkio audience UUID
     name: str                            # Friendly label for reports
     brand_keywords: list[str]            # Keywords matched via LIKE on BRAND_NAME / STORE_NAME / MERCHANT_DESCRIPTION
-    date_start: str = "2025-08-01"       # Inclusive start of the holdout window
+    date_start: str = "2025-09-01"       # Inclusive start of the holdout window
     date_end: str = "2025-10-01"         # Exclusive end of the holdout window
     database: str = "DEMO"               # Snowflake database for AUDIENCE_LOOKUP / AUDIENCE_METADATA
     schema: str = "AFS_POC"              # Snowflake schema for AUDIENCE_LOOKUP / AUDIENCE_METADATA
@@ -69,10 +62,7 @@ class AudienceConfig:
     fact_schema: str = "AFS_POC"         # Snowflake schema for FACT_TRANSACTION_ENRICHED
 
 
-# ===================================================================
 # Config loader
-# ===================================================================
-
 def load_audiences(config_path: Path = CONFIG_PATH) -> list[AudienceConfig]:
     """Load audience definitions from the YAML config file."""
     if not config_path.exists():
@@ -109,9 +99,7 @@ def load_audiences(config_path: Path = CONFIG_PATH) -> list[AudienceConfig]:
     return audiences
 
 
-# ---------------------------------------------------------------------------
 # SQL Template
-# ---------------------------------------------------------------------------
 VALIDATION_SQL_TEMPLATE = """
 WITH AUDIENCE AS (
   SELECT AKKIO_ID
@@ -189,10 +177,7 @@ def _build_brand_filter(keywords: list[str]) -> str:
     return "\n      OR ".join(clauses)
 
 
-# ---------------------------------------------------------------------------
 # Snowflake connection helpers
-# ---------------------------------------------------------------------------
-
 def _get_snowflake_conn_from_env() -> dict:
     """Try to build connection params from environment variables."""
     required = ["SNOWFLAKE_ACCOUNT", "SNOWFLAKE_USER", "SNOWFLAKE_PASSWORD"]
@@ -253,10 +238,7 @@ def get_snowflake_connection() -> snowflake.connector.SnowflakeConnection:
     return snowflake.connector.connect(**params)
 
 
-# ---------------------------------------------------------------------------
 # Core validation logic
-# ---------------------------------------------------------------------------
-
 def validate_audience(
     conn: snowflake.connector.SnowflakeConnection,
     audience: AudienceConfig,
@@ -318,10 +300,7 @@ def validate_all(audiences: list[AudienceConfig]) -> pd.DataFrame:
     return combined
 
 
-# ---------------------------------------------------------------------------
 # Display / export helpers
-# ---------------------------------------------------------------------------
-
 CURRENCY_COLS = {"BRAND_SPEND", "SPEND_RATE", "AVERAGE_TICKET"}
 PERCENT_COLS = {"SHOP_RATE"}
 INT_COLS = {"TOTAL_LAL_IDS", "ACTIVE_MATCHED_IDS", "BRAND_SHOPPERS", "BRAND_TRANSACTIONS"}
@@ -383,10 +362,7 @@ def export_csv(df: pd.DataFrame, output_dir: Path) -> Path:
     return csv_path
 
 
-# ---------------------------------------------------------------------------
 # Main
-# ---------------------------------------------------------------------------
-
 def main():
     log.info("Loading config from %s", CONFIG_PATH)
     audiences = load_audiences()
