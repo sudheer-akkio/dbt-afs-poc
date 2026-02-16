@@ -77,10 +77,13 @@ For complex audience queries combining multiple time-based conditions:
 | Table | Purpose |
 |-------|---------|
 | `FACT_TRANSACTION_ENRICHED` | Transaction-level data with AKKIO_ID, TRANS_DATE, TRANS_AMOUNT, TRANSACTION_CHANNEL, BRAND_NAME, STORE_NAME, MERCHANT_DESCRIPTION, etc. |
-| `V_AKKIO_ATTRIBUTES_LATEST` | Demographic and behavioral profile per AKKIO_ID (demographics, interests, propensities). Contains the core demographic fields listed in Audience Building Defaults. |
+| `V_AKKIO_ATTRIBUTES_LATEST` | Demographic and behavioral profile per AKKIO_ID (demographics, interests, propensities — GENDER, AGE, ETHNICITY, STATE, INCOME_BUCKET, NET_WORTH_BUCKET, EDUCATION_LEVEL, OCCUPATION, HOMEOWNER_STATUS, MARITAL_STATUS, and all interest/propensity fields). |
+| `RFM_FEATURES` | **Pre-materialized RFM features** per AKKIO_ID — 5 time windows (12mo, 9mo, 6mo, 3mo, 1mo) × 6 metrics (total trans, total spend, online trans, online spend, avg days between trans, brand diversity) + recency fields + online_ratio_12mo. **Always use this instead of computing RFM inline from FACT_TRANSACTION_ENRICHED** for lookalike scoring and audience profiling. Check `rfm_ref_date` column to see which date cutoff the table was built with. |
 
 ### Joining Pattern
 - Use `AKKIO_ID` as the join key across all tables.
+- For **audience profiling and lookalike scoring**, join `RFM_FEATURES` to `V_AKKIO_ATTRIBUTES_LATEST` on `AKKIO_ID`. Do NOT re-compute RFM from `FACT_TRANSACTION_ENRICHED` — use the pre-materialized table.
+- For **seed identification** (brand matching), use `FACT_TRANSACTION_ENRICHED` to find brand shoppers, then join to `RFM_FEATURES` for their features.
 - Identify shoppers from `FACT_TRANSACTION_ENRICHED`, then LEFT JOIN to `V_AKKIO_ATTRIBUTES_LATEST` for their full demographic/behavioral profile.
 
 ---
@@ -103,43 +106,48 @@ Replace `<KEYWORD>` with the uppercased brand name (e.g., `ACTBLUE`, `WALMART`, 
 
 ## RFM Feature Engineering (Required for Audience Builds)
 
-**ALWAYS include RFM (Recency, Frequency, Monetary) features when building any audience.** Compute these from `FACT_TRANSACTION_ENRICHED`.
+**ALWAYS include RFM (Recency, Frequency, Monetary) features when building any audience.**
 
-### Source Columns
-- `AKKIO_ID` — group by this
-- `TRANS_DATE` — for recency / time windows
-- `TRANS_AMOUNT` — for monetary
-- `TRANSACTION_CHANNEL` — 'ONLINE' or 'B&M'
+### Pre-Materialized RFM Table: `RFM_FEATURES`
 
-### Date Cutoff Handling
-- When the prompt specifies a **hard cutoff date** (e.g., "through July 31, 2025"), use that date as the reference date for RFM calculations instead of `MAX(TRANS_DATE)`.
-- Filter all transactions to `TRANS_DATE < '<cutoff_day_after>'` (e.g., `< '2025-08-01'`) and set `ref_date` to the cutoff date.
-- When **no cutoff** is specified, derive `ref_date` from `MAX(TRANS_DATE)` as usual.
+**ALWAYS use the `RFM_FEATURES` table** for RFM data instead of computing features inline from `FACT_TRANSACTION_ENRICHED`. This table is pre-materialized and mirrors the Affinity Solutions data mart feature set. **Never compute RFM inline** — the pre-materialized table exists to prevent query timeouts caused by scanning the full transaction table.
 
-### RFM SQL Pattern
+**Available features (per time window: 12mo, 9mo, 6mo, 3mo, 1mo):**
 
-```sql
--- ref_date: use the hard cutoff date if specified, otherwise MAX(TRANS_DATE)
-WITH ref AS (SELECT '<cutoff_date>'::DATE AS ref_date),  -- or MAX(TRANS_DATE)
-rfm AS (
-  SELECT AKKIO_ID,
-    MAX(TRANS_DATE) AS last_txn_date,
-    DATEDIFF(day, MAX(TRANS_DATE), (SELECT ref_date FROM ref)) AS days_since_last_txn,
-    COUNT(CASE WHEN TRANS_DATE >= DATEADD(month, -12, (SELECT ref_date FROM ref)) THEN 1 END) AS tot_trans_12mo,
-    COUNT(CASE WHEN TRANS_DATE >= DATEADD(month, -3,  (SELECT ref_date FROM ref)) THEN 1 END) AS tot_trans_3mo,
-    SUM(CASE WHEN TRANS_DATE >= DATEADD(month, -12, (SELECT ref_date FROM ref)) THEN TRANS_AMOUNT END) AS tot_spend_12mo,
-    SUM(CASE WHEN TRANS_DATE >= DATEADD(month, -3,  (SELECT ref_date FROM ref)) THEN TRANS_AMOUNT END) AS tot_spend_3mo,
-    COUNT(CASE WHEN TRANSACTION_CHANNEL = 'ONLINE'
-               AND TRANS_DATE >= DATEADD(month, -12, (SELECT ref_date FROM ref)) THEN 1 END) AS tot_online_trans_12mo
-  FROM FACT_TRANSACTION_ENRICHED
-  WHERE TRANS_DATE < '<cutoff_day_after>'  -- omit if no hard cutoff
-  GROUP BY AKKIO_ID
-)
-```
+| Column Pattern | Description |
+|----------------|-------------|
+| `tot_trans_{window}` | Total transaction count |
+| `tot_spend_{window}` | Total spend amount |
+| `tot_online_trans_{window}` | Online transaction count |
+| `tot_online_spend_{window}` | Online spend amount |
+| `avg_days_btwn_trans_{window}` | Average days between transactions (cadence) |
+| `brand_diversity_{window}` | Count of distinct brands transacted with |
+
+**Additional columns:**
+
+| Column | Description |
+|--------|-------------|
+| `AKKIO_ID` | Individual identifier (primary key) |
+| `rfm_ref_date` | Reference date used for this build — check this value to confirm which cutoff the current table was built with |
+| `last_txn_date` | Most recent transaction date (within the build window) |
+| `days_since_last_txn` | Days from last txn to reference date |
+| `online_ratio_12mo` | Pre-computed online ratio (12mo) |
+
+### When to Use `RFM_FEATURES` vs `FACT_TRANSACTION_ENRICHED`
+
+| Use Case | Source Table |
+|----------|-------------|
+| Audience scoring / lookalike builds | `RFM_FEATURES` (pre-computed, fast) |
+| Audience profiling & demographics | `RFM_FEATURES` + `V_AKKIO_ATTRIBUTES_LATEST` |
+| **Seed identification** (brand matching) | `FACT_TRANSACTION_ENRICHED` (needs BRAND_NAME, STORE_NAME, MERCHANT_DESCRIPTION) |
+
+**IMPORTANT:** Never compute RFM inline from `FACT_TRANSACTION_ENRICHED` in audience or lookalike queries — this will cause query timeouts. Always read from `RFM_FEATURES`.
 
 ### Time Windows & Interpretation
 - **Windows:** 12mo, 9mo, 6mo, 3mo, 1mo
 - **Trend detection:** `tot_trans_3mo / NULLIF(tot_trans_12mo, 0) > 0.4` = accelerating shopper
+- **Cadence:** `avg_days_btwn_trans_12mo` < 7 = weekly shopper; < 30 = monthly; > 60 = infrequent
+- **Channel mix:** `online_ratio_12mo` or `tot_online_trans_12mo::FLOAT / NULLIF(tot_trans_12mo, 0)`
 - **Higher** spend/frequency = more engaged; **Lower** days_since_last_txn = more recent
 
 ---
@@ -149,302 +157,358 @@ rfm AS (
 When asked to build a brand-shopper audience with demographics and RFM features, follow this pattern:
 
 1. **Identify brand shoppers** — CTE that selects distinct `AKKIO_ID` from `FACT_TRANSACTION_ENRICHED` matching the brand keyword(s) (see Brand / Merchant Identification), applying any date filters.
-2. **Compute RFM features** — CTE grouped by `AKKIO_ID` over the same (or specified) date range (see RFM SQL Pattern).
-3. **Join demographics** — LEFT JOIN the brand-shopper set to `V_AKKIO_ATTRIBUTES_LATEST` on `AKKIO_ID` to pull the core demographic fields (see Audience Building Defaults).
+2. **Join RFM features** — JOIN the brand-shopper set to `RFM_FEATURES` on `AKKIO_ID` to pull pre-computed behavioral features. Do NOT compute RFM inline.
+3. **Join demographics** — LEFT JOIN to `V_AKKIO_ATTRIBUTES_LATEST` on `AKKIO_ID` to pull demographic, interest, and propensity fields.
 4. **Final SELECT** — Return AKKIO_ID, all core demographic fields, and all RFM features.
 
 ---
 
-## Lookalike / Prospecting Audience Scoring
+## Deterministic Lookalike Audience Methodology
 
-When building lookalike or prospecting audiences (finding new potential shoppers based on a seed brand's shopper profile), **always apply a composite scoring layer** before final ID selection. This ensures the output audience is ranked by match quality, allowing threshold-based trimming for higher precision.
+### Core Principle: Profile-Score-Rank
 
-### Why Score?
+Lookalike audiences are built **deterministically** using a scoring approach that mirrors how propensity models work — but implemented entirely in SQL without ML. The approach is:
 
-The final output of audience builds is a flat list of AKKIO_IDs with no scores or features attached. The scoring layer determines **which IDs make the cut** by prioritizing individuals who match the seed profile across multiple dimensions simultaneously, rather than treating all filter-passing IDs equally.
+1. **Profile** the seed audience on ALL available dimensions (RFM + demographics + interests)
+2. **Measure feature importance** by comparing the seed's distribution on each feature to the general population — features where the seed looks most different get the highest weight
+3. **Score** every prospect in the universe on all weighted dimensions, producing a single continuous similarity score per person
+4. **Rank** the full population by score and take the top N
 
-### Scoring Framework Overview
+**This means every lookalike query is a three-phase SQL:** profile the seed and derive feature weights, score the full population, then rank and extract the top N. All features — RFM, demographic, interest — contribute to the score. None are used as binary hard filters.
 
-The scoring framework has two layers. **Layer 1** is a fixed behavioral core derived from transaction data. **Layer 2** is a dynamic attribute layer where the AI selects whichever fields from `V_AKKIO_ATTRIBUTES_LATEST` are most discriminating for the specific seed profile. This keeps the framework open to the full breadth of 900+ attributes rather than hardcoding a fixed set.
+### Why Scoring Beats Thresholds
 
-```
-MATCH_SCORE = Layer 1 (Behavioral Core) + Layer 2 (Dynamic Attribute Match)
-```
+Binary pass/fail thresholds on a limited feature set (e.g., RFM-only) have three structural problems:
 
----
+1. **No gradient** — A prospect who barely misses one threshold is treated the same as one who misses everything. There is no "how similar" signal.
+2. **Limited signal** — Using only RFM for matching discards the strongest predictors for many brands. For niche/cause brands (e.g., ActBlue), demographics and interests are often more discriminative than general transaction behavior. For retail brands, channel and category affinity may matter as much as spend.
+3. **No ranking** — Everyone who clears the thresholds is "equally good," with no way to prioritize the best prospects or control audience size precisely.
 
-### Layer 1: Behavioral Core (Fixed — 45 pts max)
+A scoring approach solves all three: every feature contributes a weighted signal, prospects are ranked by total similarity, and audience size is controlled by taking the top N. Seed members naturally score high (they match the seed profile by definition) without being force-included, producing honest validation metrics.
 
-These dimensions are **always included** because they are computed from `FACT_TRANSACTION_ENRICHED` and are universally relevant to purchase-based audiences.
+### CRITICAL: Performance Rules for Lookalike Queries
 
-| Dimension | Max Pts | Scoring Logic |
-|-----------|---------|---------------|
-| **Spending Proximity** | 10 | +10 if 12mo spend within 0.8x–1.2x of seed avg; +5 if 0.5x–2.0x; +0 outside |
-| **Frequency Proximity** | 10 | Same tiered logic as spending, applied to 12mo transaction count |
-| **Recency** | 10 | +10 if ≤30 days since last txn; +7 if 31–60; +4 if 61–90; +0 if >90 |
-| **Channel Alignment** | 5 | +5 if B&M share within ±15% of seed; +2 if within ±30%; +0 otherwise |
-| **Seasonal Propensity** | 10 | +10 if active (≥3 txns) in both prior years' same quarter; +5 if one year; +0 if neither |
+Since `RFM_FEATURES` is pre-materialized, the entire lookalike query can be a **single `CREATE TABLE AS` with CTEs** — no temporary tables or multi-step execution needed. The heavy transaction scan is already done.
 
----
+**Required performance rules:**
+- **ALWAYS use `RFM_FEATURES`** for RFM data — never compute RFM inline from `FACT_TRANSACTION_ENRICHED` in a lookalike query. This is the single biggest performance optimization.
+- **NEVER duplicate score expressions.** Compute `NUMERIC_SIMILARITY_SCORE` and `CATEGORICAL_SIMILARITY_SCORE` once each in a CTE, then sum them as `SIMILARITY_SCORE`. Do NOT repeat the full expression in multiple SELECT columns.
+- **Pre-compute categorical importance as scalar CTEs** — compute `GREATEST(MAX(seed_share / NULLIF(pop_share, 0)), 0.1)` once per categorical field in its own CTE, then reference the scalar value in the scoring expression. Do NOT use correlated subqueries inside the per-row SELECT.
+- **ALWAYS include a date lower bound** when scanning `FACT_TRANSACTION_ENRICHED` for seed identification: `AND TRANS_DATE >= DATEADD(MONTH, -12, '<ref_date>'::DATE)`.
 
-### Layer 2: Dynamic Attribute Match (AI-Selected — Variable pts)
+### Step-by-Step Lookalike Construction
 
-Rather than prescribing a fixed list of fields, the AI **analyzes the seed profile** to determine which attributes from `V_AKKIO_ATTRIBUTES_LATEST` are most discriminating, then scores candidates on those fields. This allows the scoring to leverage any combination of demographics, interests, financial indicators, lifestyle, media, geographic, or household attributes — including patterns a human might not anticipate.
+The entire lookalike is a single SQL statement: `CREATE TABLE <output_table> AS WITH ... SELECT ...`
 
-#### Attribute Categories Available for Scoring
+#### Phase 1: Seed Identification & Population Features (CTEs)
 
-The AI should consider fields across **all** of these categories when profiling the seed. Any field that shows notable concentration or skew in the seed is a scoring candidate:
-
-| Category | Example Fields (not exhaustive) |
-|----------|-------------------------------|
-| **Core Demographics** | GENDER, AGE_BUCKET, INCOME_BUCKET, NET_WORTH_BUCKET, EDUCATION_LEVEL, MARITAL_STATUS, ETHNICITY, OCCUPATION |
-| **Household Composition** | HOMEOWNER_STATUS, PRESENCE_OF_CHILDREN, CHILD_AGE_GROUP, ADULTS_IN_HH, NUMBER_OF_CHILDREN |
-| **Financial Indicators** | CREDIT_CARD_INFO_STORE_CC_USER, CREDIT_CARD_INFO_AMEX_USER, INVEST_ACTIVE_INVESTOR, CREDIT_CARD_INFO_PREMIUM_CC_USER, and other financial propensity fields |
-| **General Interests** | GENERAL_INTERESTS_ARTS_CRAFTS, GENERAL_INTERESTS_HOME_IMPROVEMENT, GENERAL_INTERESTS_HEALTHY_LIVING, GENERAL_INTERESTS_GOURMET_COOKING, etc. |
-| **Sports & Fitness** | SPORTS_INTERESTS_FITNESS, SPORTS_INTERESTS_GOLF, SPORTS_INTERESTS_RUNNING, SPORTS_INTERESTS_OUTDOOR, etc. |
-| **Travel & Lifestyle** | TRAVEL_INTERESTS_HEAVY_TRAVEL, TRAVEL_INTERESTS_TRAVEL_REWARDS, TRAVEL_INTERESTS_DISNEY, etc. |
-| **Media & Entertainment** | APP_SERVICES_USED, NETWORKS_WATCHED, GENRES_WATCHED, TITLES_WATCHED (via `v_agg_akkio_ind_media`) |
-| **Geographic** | STATE, ZIP_CODE, CBSA_CODE, MARKET_AREA_TYPE |
-
-#### How to Select Scoring Attributes (Seed Profile Analysis)
-
-Before building the scoring SQL, analyze the seed profile to identify discriminating fields:
-
-1. **Categorical fields** (e.g., GENDER, INCOME_BUCKET, HOMEOWNER_STATUS): A field is discriminating if its **mode accounts for a disproportionately high share** of the seed compared to the general population, or if the seed is concentrated in fewer distinct values than expected. Include it as a scoring field.
-2. **Percentile / propensity fields** (e.g., interest and financial fields on the 1–99 or 1–10 scale): A field is discriminating if the **seed's average is notably skewed** from the midpoint (e.g., seed avg < 35 on a 1–99 field indicates strong over-indexing). Include it as a scoring field.
-3. **Geographic fields**: If the seed shows strong geographic concentration (e.g., >40% in one state or a handful of CBSAs), geographic fields become scoring candidates.
-4. **No hard cap on attribute count** — include as many fields as are genuinely discriminating. Typical builds may use 5–20 attributes depending on how distinctive the seed profile is.
-
-#### Scoring Logic by Field Type
-
-| Field Type | Full Match (2 pts) | Partial Match (1 pt) | No Match (0 pts) |
-|------------|-------------------|---------------------|------------------|
-| **Categorical** | Value equals the seed **mode** | Value exists anywhere in the seed (but is not the mode) | Value not in seed |
-| **Percentile 1–99** | `TRY_CAST(field AS FLOAT) < 35` (strong over-index, matching seed skew) | `TRY_CAST(field AS FLOAT) < 50` (moderate over-index) | `>= 50` or NULL |
-| **Scale 1–10** | `TRY_CAST(field AS FLOAT) <= 3` | `TRY_CAST(field AS FLOAT) <= 5` | `> 5` or NULL |
-| **Geographic** | Exact match to seed mode (e.g., same STATE) | Matches any seed value | Not in seed |
-
-> **Note:** For percentile/scale fields, the thresholds above are defaults. Adjust them based on the actual seed distribution — if the seed averages 20 on a field, use tighter thresholds; if 45, use looser ones.
-
-#### Dynamic Max Score Calculation
-
-Since the number of scored attributes varies per build:
-
-```
-MAX_SCORE = 45 (behavioral core) + 2 × N (where N = number of selected attributes)
-```
-
-For example: 10 selected attributes → max = 45 + 20 = 65. 15 selected attributes → max = 45 + 30 = 75.
-
----
-
-### Extended RFM CTE for Scoring
-
-When applying the scoring layer, extend the standard RFM CTE (see RFM SQL Pattern above) to include B&M transaction counts and seasonal quarterly counts:
+Identify seed shoppers from `FACT_TRANSACTION_ENRICHED` (brand matching), then join `RFM_FEATURES` for pre-computed features and `V_AKKIO_ATTRIBUTES_LATEST` for demographics.
 
 ```sql
-rfm_extended AS (
-  SELECT AKKIO_ID,
-    MAX(TRANS_DATE) AS last_txn_date,
-    DATEDIFF(day, MAX(TRANS_DATE), (SELECT ref_date FROM ref)) AS days_since_last_txn,
-    COUNT(CASE WHEN TRANS_DATE >= DATEADD(month, -12, (SELECT ref_date FROM ref)) THEN 1 END) AS tot_trans_12mo,
-    SUM(CASE WHEN TRANS_DATE >= DATEADD(month, -12, (SELECT ref_date FROM ref)) THEN TRANS_AMOUNT END) AS tot_spend_12mo,
-    COUNT(CASE WHEN TRANSACTION_CHANNEL = 'ONLINE'
-               AND TRANS_DATE >= DATEADD(month, -12, (SELECT ref_date FROM ref)) THEN 1 END) AS tot_online_trans_12mo,
-    COUNT(CASE WHEN TRANSACTION_CHANNEL = 'B&M'
-               AND TRANS_DATE >= DATEADD(month, -12, (SELECT ref_date FROM ref)) THEN 1 END) AS tot_bm_trans_12mo,
-    /* --- Seasonal quarterly counts (adapt date ranges to the relevant seasonal period) --- */
-    COUNT(CASE WHEN TRANS_DATE >= '2024-10-01' AND TRANS_DATE < '2025-01-01' THEN 1 END) AS tot_trans_q4_2024,
-    COUNT(CASE WHEN TRANS_DATE >= '2023-10-01' AND TRANS_DATE < '2024-01-01' THEN 1 END) AS tot_trans_q4_2023
+CREATE TABLE <output_table> AS
+WITH
+-- 1a. Identify seed shoppers (brand buyers within the specified date window)
+SEED_IDS AS (
+  SELECT DISTINCT AKKIO_ID
   FROM FACT_TRANSACTION_ENRICHED
-  WHERE TRANS_DATE < '<cutoff_day_after>'  -- omit if no hard cutoff
-  GROUP BY AKKIO_ID
-)
-```
-
-### Seed Summary CTE Pattern
-
-Compute modal values and averages from the seed shoppers. The fields included here should reflect whatever attributes the AI selected during seed profile analysis. The example below shows the pattern — **add or remove attribute columns as needed.**
-
-```sql
-SEED_SUMMARY AS (
-  SELECT
-    /* --- Modal values for each selected categorical attribute --- */
-    /* Include one subquery per categorical field identified as discriminating */
-    (SELECT TOP 1 <FIELD_NAME> FROM SEED_DEMOGRAPHICS
-     GROUP BY <FIELD_NAME> ORDER BY COUNT(*) DESC) AS MODE_<FIELD_NAME>,
-    -- ... repeat for each selected categorical attribute ...
-
-    /* --- Average percentile for each selected interest/propensity field --- */
-    AVG(TRY_CAST(SD.<INTEREST_FIELD> AS FLOAT)) AS AVG_<INTEREST_FIELD>,
-    -- ... repeat for each selected percentile field ...
-
-    /* --- Behavioral averages (always included) --- */
-    AVG(RF.TOT_SPEND_12MO) AS AVG_SPEND_12MO,
-    AVG(RF.TOT_TRANS_12MO) AS AVG_TRANS_12MO,
-    AVG(RF.DAYS_SINCE_LAST_TXN) AS AVG_RECENCY,
-    SUM(RF.TOT_BM_TRANS_12MO) * 1.0
-      / NULLIF(SUM(RF.TOT_BM_TRANS_12MO) + SUM(RF.TOT_ONLINE_TRANS_12MO), 0)
-      AS SEED_BM_SHARE
-  FROM SEED_DEMOGRAPHICS SD
-  INNER JOIN SEED_RFM RF ON SD.AKKIO_ID = RF.AKKIO_ID
-)
-```
-
-### Scoring SQL Pattern
-
-The `SCORED_AUDIENCE` CTE applies scoring on top of existing filters. The AI instantiates one score column per selected attribute using the patterns below, plus the fixed behavioral scores. `CROSS JOIN SEED_SUMMARY SS` makes seed aggregates available to every row.
-
-```sql
-SCORED_AUDIENCE AS (
-  SELECT
-    AD.AKKIO_ID,
-
-    /* ============================================================
-       LAYER 2: Dynamic Attribute Scores
-       Instantiate one CASE block per AI-selected attribute.
-       ============================================================ */
-
-    /* --- Pattern for CATEGORICAL attributes (e.g., GENDER, INCOME_BUCKET, STATE) --- */
-    CASE
-      WHEN AD.<FIELD> = SS.MODE_<FIELD> THEN 2
-      WHEN AD.<FIELD> IN (
-        SELECT DISTINCT <FIELD> FROM SEED_DEMOGRAPHICS WHERE <FIELD> IS NOT NULL
-      ) THEN 1
-      ELSE 0
-    END AS <FIELD>_SCORE,
-    -- ... repeat for each selected categorical attribute ...
-
-    /* --- Pattern for PERCENTILE 1-99 attributes (e.g., interest/propensity fields) --- */
-    CASE
-      WHEN TRY_CAST(AD.<INTEREST_FIELD> AS FLOAT) < 35 THEN 2
-      WHEN TRY_CAST(AD.<INTEREST_FIELD> AS FLOAT) < 50 THEN 1
-      ELSE 0
-    END AS <INTEREST_FIELD>_SCORE,
-    -- ... repeat for each selected percentile attribute ...
-
-    /* --- Pattern for SCALE 1-10 attributes (AMEX_USER, DISCOVER_USER, etc.) --- */
-    CASE
-      WHEN TRY_CAST(AD.<SCALE_FIELD> AS FLOAT) <= 3 THEN 2
-      WHEN TRY_CAST(AD.<SCALE_FIELD> AS FLOAT) <= 5 THEN 1
-      ELSE 0
-    END AS <SCALE_FIELD>_SCORE,
-    -- ... repeat for each selected 1-10 scale attribute ...
-
-    /* ============================================================
-       LAYER 1: Behavioral Core Scores (always included)
-       ============================================================ */
-
-    /* --- Spending proximity --- */
-    CASE
-      WHEN RF.TOT_SPEND_12MO BETWEEN SS.AVG_SPEND_12MO * 0.8 AND SS.AVG_SPEND_12MO * 1.2 THEN 10
-      WHEN RF.TOT_SPEND_12MO BETWEEN SS.AVG_SPEND_12MO * 0.5 AND SS.AVG_SPEND_12MO * 2.0 THEN 5
-      ELSE 0
-    END AS SPEND_SCORE,
-
-    /* --- Frequency proximity --- */
-    CASE
-      WHEN RF.TOT_TRANS_12MO BETWEEN SS.AVG_TRANS_12MO * 0.8 AND SS.AVG_TRANS_12MO * 1.2 THEN 10
-      WHEN RF.TOT_TRANS_12MO BETWEEN SS.AVG_TRANS_12MO * 0.5 AND SS.AVG_TRANS_12MO * 2.0 THEN 5
-      ELSE 0
-    END AS FREQ_SCORE,
-
-    /* --- Recency --- */
-    CASE
-      WHEN RF.DAYS_SINCE_LAST_TXN <= 30 THEN 10
-      WHEN RF.DAYS_SINCE_LAST_TXN <= 60 THEN 7
-      WHEN RF.DAYS_SINCE_LAST_TXN <= 90 THEN 4
-      ELSE 0
-    END AS RECENCY_SCORE,
-
-    /* --- Channel alignment --- */
-    CASE
-      WHEN ABS(
-        RF.TOT_BM_TRANS_12MO * 1.0 / NULLIF(RF.TOT_BM_TRANS_12MO + RF.TOT_ONLINE_TRANS_12MO, 0)
-        - SS.SEED_BM_SHARE
-      ) <= 0.15 THEN 5
-      WHEN ABS(
-        RF.TOT_BM_TRANS_12MO * 1.0 / NULLIF(RF.TOT_BM_TRANS_12MO + RF.TOT_ONLINE_TRANS_12MO, 0)
-        - SS.SEED_BM_SHARE
-      ) <= 0.30 THEN 2
-      ELSE 0
-    END AS CHANNEL_SCORE,
-
-    /* --- Seasonal propensity (adapt quarter dates to the relevant period) --- */
-    CASE
-      WHEN RF.TOT_TRANS_Q4_2024 >= 3 AND RF.TOT_TRANS_Q4_2023 >= 3 THEN 10
-      WHEN RF.TOT_TRANS_Q4_2024 >= 3 OR RF.TOT_TRANS_Q4_2023 >= 3 THEN 5
-      ELSE 0
-    END AS SEASONAL_SCORE
-
-  FROM ALL_DEMOGRAPHICS AD
-  INNER JOIN ALL_CARDHOLDERS_RFM RF ON AD.AKKIO_ID = RF.AKKIO_ID
-  CROSS JOIN SEED_SUMMARY SS
-  WHERE
-    /* ... existing filter criteria remain as minimum thresholds ... */
+  WHERE (<brand_filter>)
+    AND TRANS_DATE >= DATEADD(MONTH, -12, '<ref_date>'::DATE)  -- ALWAYS include lower bound!
+    AND TRANS_DATE < '<cutoff_day_after>'
 ),
 
-FINAL_SCORED AS (
+-- 1b. Population features: read from RFM_FEATURES (pre-materialized) + demographics
+--     CRITICAL: Do NOT re-compute RFM from FACT_TRANSACTION_ENRICHED here.
+POP_FEATURES AS (
   SELECT
-    *,
-    (
-      /* Layer 2: sum of all dynamic attribute scores */
-      <FIELD>_SCORE + <INTEREST_FIELD>_SCORE + /* ... all selected attribute scores ... */
-      /* Layer 1: behavioral core */
-      SPEND_SCORE + FREQ_SCORE + RECENCY_SCORE + CHANNEL_SCORE + SEASONAL_SCORE
-    ) AS MATCH_SCORE
-  FROM SCORED_AUDIENCE
-)
-
-/* Final output: only IDs, selected from highest-scoring matches */
-SELECT AKKIO_ID
-FROM FINAL_SCORED
-WHERE MATCH_SCORE >= (MAX_SCORE * 0.60)  -- use percentage-based threshold (see guidance below)
-ORDER BY MATCH_SCORE DESC
+    r.AKKIO_ID,
+    r.days_since_last_txn,
+    r.tot_trans_12mo, r.tot_spend_12mo,
+    r.tot_online_trans_12mo, r.tot_online_spend_12mo,
+    r.avg_days_btwn_trans_12mo, r.brand_diversity_12mo, r.online_ratio_12mo,
+    r.tot_trans_9mo, r.tot_spend_9mo, r.tot_online_trans_9mo, r.tot_online_spend_9mo,
+    r.avg_days_btwn_trans_9mo, r.brand_diversity_9mo,
+    r.tot_trans_6mo, r.tot_spend_6mo, r.tot_online_trans_6mo, r.tot_online_spend_6mo,
+    r.avg_days_btwn_trans_6mo, r.brand_diversity_6mo,
+    r.tot_trans_3mo, r.tot_spend_3mo, r.tot_online_trans_3mo, r.tot_online_spend_3mo,
+    r.avg_days_btwn_trans_3mo, r.brand_diversity_3mo,
+    r.tot_trans_1mo, r.tot_spend_1mo, r.tot_online_trans_1mo, r.tot_online_spend_1mo,
+    r.avg_days_btwn_trans_1mo, r.brand_diversity_1mo,
+    CASE WHEN s.AKKIO_ID IS NOT NULL THEN 1 ELSE 0 END AS IS_SEED,
+    d.GENDER, d.STATE, d.POLITICS, d.INCOME_BUCKET, d.EDUCATION_LEVEL,
+    d.ETHNICITY, d.AGE, d.MARITAL_STATUS, d.HOMEOWNER_STATUS,
+    d.NET_WORTH_BUCKET, d.OCCUPATION
+    -- ... include ALL demographic, interest, and propensity fields from V_AKKIO_ATTRIBUTES_LATEST
+  FROM RFM_FEATURES r
+  LEFT JOIN SEED_IDS s ON r.AKKIO_ID = s.AKKIO_ID
+  LEFT JOIN V_AKKIO_ATTRIBUTES_LATEST d ON r.AKKIO_ID = d.AKKIO_ID
+),
 ```
 
-### Threshold Guidance
+**Critical:** The LLM must include ALL columns from `V_AKKIO_ATTRIBUTES_LATEST` — not a hand-picked subset. The data itself determines which features are discriminative for a given seed.
 
-Since the max score varies per build (depending on how many attributes the AI selects), **always express thresholds as a percentage of the calculated max score** rather than hard-coded numbers.
+#### Phase 2: Statistics & Scoring (CTEs continued)
 
-| Audience Goal | Threshold (% of max) | Expected Behavior |
-|---------------|---------------------|-------------------|
-| **High precision** (validation, small campaigns) | `>= 75%` of max | Smaller audience, higher shop rate |
-| **Balanced** (standard campaigns) | `>= 60%` of max | Moderate size, good shop rate |
-| **High reach** (awareness campaigns) | `>= 45%` of max | Larger audience, lower shop rate |
+Compute seed/population statistics from the `POP_FEATURES` CTE, pre-compute categorical importance as scalar CTEs, then score every prospect.
 
-When the user does not specify a precision preference, default to the **Balanced** threshold (60%).
+##### Feature Importance (Automatic Weighting)
 
-To apply: calculate `MAX_SCORE = 45 + 2 * N` (where N = number of selected attributes), then set the WHERE clause threshold to `ROUND(MAX_SCORE * 0.60)` (or the appropriate percentage).
+Feature importance is derived from how different the seed looks from the general population on each dimension. **Always apply a floor of 0.1** to prevent complete zeroing when the seed is not strongly distinctive:
 
-### Key Rules
+- **Numeric features:** `importance = GREATEST(ABS(seed_mean - pop_mean) / NULLIF(pop_stddev, 0), 0.1)` — the number of population standard deviations the seed mean is from the population mean, floored at 0.1.
+- **Categorical features:** `importance = GREATEST(MAX(seed_share / NULLIF(pop_share, 0)), 0.1)` across all values — the peak lift for the most over-represented category value, floored at 0.1.
 
-1. **Existing filters remain as minimum qualifiers** — the scoring layer sits on top, it does not replace the demographic, behavioral, and interest filters.
-2. **Seed profile analysis drives attribute selection** — do not default to a fixed set of fields. Analyze the seed across all attribute categories and select those that are genuinely discriminating. Include unexpected fields (e.g., media preferences, investment behavior, niche interests) when the seed shows clear skew.
-3. **Mode-based scoring for categorical fields** — use the most common value from the seed profile (via `SEED_SUMMARY`) for full points. This addresses the weakness of bare `IN (SELECT ...)` matching.
-4. **Threshold-based scoring for percentile fields** — adapt the `< 35` / `< 50` defaults based on the seed's actual average for each field. If the seed averages 20 on a field, tighten to `< 25` / `< 40`.
-5. **The MATCH_SCORE column is internal only** — it is used for filtering and ordering but is NOT included in the final output. The final SELECT returns only AKKIO_ID (and demographic/RFM columns if requested).
-6. **Seasonal scoring should adapt** — if the target period is not Q4, substitute the relevant quarter. Always use at least two prior years of the same period for scoring. Update the date ranges in both the extended RFM CTE and the seasonal scoring CASE.
-7. **Seed profile aggregation** — compute all seed averages and modes in the `SEED_SUMMARY` CTE, then reference it via `CROSS JOIN`. Never recompute aggregates inline.
-8. **Extended RFM CTE required** — when scoring is applied, extend the standard RFM CTE to include `tot_bm_trans_12mo` and seasonal quarterly counts.
-9. **Document attribute selection** — when generating the scoring SQL, include a comment block at the top listing which attributes were selected and why (e.g., "GENDER: mode F = 68% of seed vs ~50% general population").
+Features with importance near the floor (seed ≈ population) contribute minimal signal. Features with high importance (seed very different from population) dominate the score. This is the SQL equivalent of learned feature importance in a propensity model.
 
----
+##### Gaussian Bandwidth (Small Seed Protection)
 
-## Extended Workflow for Lookalike / Prospecting Audiences
+**Always use `GREATEST(COALESCE(seed_std, 0), 0.5 * pop_std)` as the Gaussian bandwidth** instead of raw `NULLIF(seed_std, 0)`. This prevents scoring failures for small or homogeneous seeds:
 
-When building **lookalike or prospecting audiences**, extend the standard workflow with scoring steps:
+- If seed has 1 member, `STDDEV = NULL` → bandwidth falls back to `0.5 * pop_std`
+- If seed members are identical on a feature, `STDDEV = 0` → bandwidth falls back to `0.5 * pop_std`
+- If seed has normal variance, `seed_std > 0.5 * pop_std` → bandwidth uses `seed_std` (no change)
 
-1. **Identify seed shoppers** — CTE matching brand keyword(s), applying date and experiment group filters.
-2. **Compute seed RFM features** — CTE grouped by AKKIO_ID (use extended RFM pattern with B&M and seasonal counts).
-3. **Join seed demographics** — LEFT JOIN to `V_AKKIO_ATTRIBUTES_LATEST` (pull all attribute columns that may be relevant, not just core demographics).
-4. **Analyze seed profile** — examine the seed across all attribute categories (demographics, interests, financial, lifestyle, media, geographic, household). Identify fields where the seed shows notable concentration or skew. Select these as scoring attributes.
-5. **Build seed summary** — `SEED_SUMMARY` CTE computing modal values for selected categorical attributes, average values for selected percentile attributes, and average behavioral metrics.
-6. **Identify candidate pool** — CTE of non-seed cardholders with RFM and demographics.
-7. **Apply minimum filters** — WHERE clause with demographic, behavioral, and interest thresholds.
-8. **Score candidates** — `SCORED_AUDIENCE` CTE computing MATCH_SCORE across behavioral core + all selected attributes (CROSS JOIN to `SEED_SUMMARY`).
-9. **Threshold and rank** — Filter by percentage-based MATCH_SCORE threshold, ORDER BY MATCH_SCORE DESC.
-10. **Final SELECT** — Return AKKIO_ID (and profile columns if requested). Do NOT return MATCH_SCORE.
+The 0.5 multiplier means the Gaussian is twice as selective as the population spread — still providing meaningful differentiation while preventing collapse.
+
+##### Scoring SQL Pattern (continued from Phase 1 CTEs)
+
+```sql
+-- 2a. Seed numeric statistics (computed from POP_FEATURES CTE, not raw transactions)
+SEED_NUMERIC_STATS AS (
+  SELECT
+    AVG(days_since_last_txn) AS seed_mean_recency,
+    STDDEV(days_since_last_txn) AS seed_std_recency,
+    AVG(tot_trans_12mo) AS seed_mean_freq,
+    STDDEV(tot_trans_12mo) AS seed_std_freq,
+    AVG(tot_spend_12mo) AS seed_mean_spend,
+    STDDEV(tot_spend_12mo) AS seed_std_spend,
+    AVG(tot_trans_3mo) AS seed_mean_freq_3mo,
+    STDDEV(tot_trans_3mo) AS seed_std_freq_3mo,
+    AVG(online_ratio_12mo) AS seed_mean_online_ratio,
+    STDDEV(online_ratio_12mo) AS seed_std_online_ratio,
+    AVG(brand_diversity_12mo) AS seed_mean_brand_div,
+    STDDEV(brand_diversity_12mo) AS seed_std_brand_div,
+    AVG(avg_days_btwn_trans_12mo) AS seed_mean_cadence,
+    STDDEV(avg_days_btwn_trans_12mo) AS seed_std_cadence,
+    AVG(CAST(AGE AS FLOAT)) AS seed_mean_age,
+    STDDEV(CAST(AGE AS FLOAT)) AS seed_std_age
+    -- ... repeat for ALL numeric features (RFM across all windows + demographics + interests)
+  FROM POP_FEATURES
+  WHERE IS_SEED = 1
+),
+
+-- 2b. Population numeric statistics
+POP_NUMERIC_STATS AS (
+  SELECT
+    AVG(days_since_last_txn) AS pop_mean_recency,
+    STDDEV(days_since_last_txn) AS pop_std_recency,
+    AVG(tot_trans_12mo) AS pop_mean_freq,
+    STDDEV(tot_trans_12mo) AS pop_std_freq,
+    AVG(tot_spend_12mo) AS pop_mean_spend,
+    STDDEV(tot_spend_12mo) AS pop_std_spend,
+    AVG(tot_trans_3mo) AS pop_mean_freq_3mo,
+    STDDEV(tot_trans_3mo) AS pop_std_freq_3mo,
+    AVG(online_ratio_12mo) AS pop_mean_online_ratio,
+    STDDEV(online_ratio_12mo) AS pop_std_online_ratio,
+    AVG(brand_diversity_12mo) AS pop_mean_brand_div,
+    STDDEV(brand_diversity_12mo) AS pop_std_brand_div,
+    AVG(avg_days_btwn_trans_12mo) AS pop_mean_cadence,
+    STDDEV(avg_days_btwn_trans_12mo) AS pop_std_cadence,
+    AVG(CAST(AGE AS FLOAT)) AS pop_mean_age,
+    STDDEV(CAST(AGE AS FLOAT)) AS pop_std_age
+    -- ... same fields as SEED_NUMERIC_STATS
+  FROM POP_FEATURES
+),
+
+-- 2c. Categorical distributions + pre-computed importance as scalars
+--     CRITICAL: Compute importance once per field in its own CTE.
+--     Do NOT use correlated subqueries in the scoring SELECT.
+--     Repeat this 3-CTE pattern for EVERY categorical field.
+SEED_CAT_GENDER AS (
+  SELECT GENDER AS cat_value, COUNT(*)::FLOAT / SUM(COUNT(*)) OVER () AS seed_share
+  FROM POP_FEATURES WHERE IS_SEED = 1 AND GENDER IS NOT NULL GROUP BY GENDER
+),
+POP_CAT_GENDER AS (
+  SELECT GENDER AS cat_value, COUNT(*)::FLOAT / SUM(COUNT(*)) OVER () AS pop_share
+  FROM POP_FEATURES WHERE GENDER IS NOT NULL GROUP BY GENDER
+),
+IMP_GENDER AS (
+  SELECT GREATEST(MAX(sc.seed_share / NULLIF(pc.pop_share, 0)), 0.1) AS importance
+  FROM SEED_CAT_GENDER sc JOIN POP_CAT_GENDER pc ON sc.cat_value = pc.cat_value
+),
+-- ... repeat SEED_CAT_, POP_CAT_, IMP_ pattern for STATE, POLITICS,
+--     INCOME_BUCKET, EDUCATION_LEVEL, ETHNICITY, MARITAL_STATUS, HOMEOWNER_STATUS,
+--     NET_WORTH_BUCKET, OCCUPATION, and ALL other categorical fields
+
+-- 2d. Score every prospect — compute each score component ONCE
+SCORED AS (
+  SELECT
+    P.AKKIO_ID,
+    P.IS_SEED,
+
+    -- Numeric scores: EXP(-0.5 * ((value - seed_mean) / bandwidth)^2) * importance
+    --   bandwidth  = GREATEST(COALESCE(seed_std, 0), 0.5 * pop_std)
+    --   importance = GREATEST(ABS(seed_mean - pop_mean) / NULLIF(pop_std, 0), 0.1)
+
+    -- Recency
+    EXP(-0.5 * POW((P.days_since_last_txn - S.seed_mean_recency)
+        / GREATEST(COALESCE(S.seed_std_recency, 0), 0.5 * POP.pop_std_recency), 2))
+      * GREATEST(ABS(S.seed_mean_recency - POP.pop_mean_recency) / NULLIF(POP.pop_std_recency, 0), 0.1)
+    + -- Frequency 12mo
+    EXP(-0.5 * POW((P.tot_trans_12mo - S.seed_mean_freq)
+        / GREATEST(COALESCE(S.seed_std_freq, 0), 0.5 * POP.pop_std_freq), 2))
+      * GREATEST(ABS(S.seed_mean_freq - POP.pop_mean_freq) / NULLIF(POP.pop_std_freq, 0), 0.1)
+    + -- Spend 12mo
+    EXP(-0.5 * POW((P.tot_spend_12mo - S.seed_mean_spend)
+        / GREATEST(COALESCE(S.seed_std_spend, 0), 0.5 * POP.pop_std_spend), 2))
+      * GREATEST(ABS(S.seed_mean_spend - POP.pop_mean_spend) / NULLIF(POP.pop_std_spend, 0), 0.1)
+    + -- Frequency 3mo
+    EXP(-0.5 * POW((P.tot_trans_3mo - S.seed_mean_freq_3mo)
+        / GREATEST(COALESCE(S.seed_std_freq_3mo, 0), 0.5 * POP.pop_std_freq_3mo), 2))
+      * GREATEST(ABS(S.seed_mean_freq_3mo - POP.pop_mean_freq_3mo) / NULLIF(POP.pop_std_freq_3mo, 0), 0.1)
+    + -- Online ratio
+    EXP(-0.5 * POW((P.online_ratio_12mo - S.seed_mean_online_ratio)
+        / GREATEST(COALESCE(S.seed_std_online_ratio, 0), 0.5 * POP.pop_std_online_ratio), 2))
+      * GREATEST(ABS(S.seed_mean_online_ratio - POP.pop_mean_online_ratio) / NULLIF(POP.pop_std_online_ratio, 0), 0.1)
+    + -- Brand diversity
+    EXP(-0.5 * POW((P.brand_diversity_12mo - S.seed_mean_brand_div)
+        / GREATEST(COALESCE(S.seed_std_brand_div, 0), 0.5 * POP.pop_std_brand_div), 2))
+      * GREATEST(ABS(S.seed_mean_brand_div - POP.pop_mean_brand_div) / NULLIF(POP.pop_std_brand_div, 0), 0.1)
+    + -- Cadence (avg days between transactions)
+    EXP(-0.5 * POW((COALESCE(P.avg_days_btwn_trans_12mo, POP.pop_mean_cadence) - S.seed_mean_cadence)
+        / GREATEST(COALESCE(S.seed_std_cadence, 0), 0.5 * POP.pop_std_cadence), 2))
+      * GREATEST(ABS(S.seed_mean_cadence - POP.pop_mean_cadence) / NULLIF(POP.pop_std_cadence, 0), 0.1)
+    + -- Age
+    EXP(-0.5 * POW((CAST(P.AGE AS FLOAT) - S.seed_mean_age)
+        / GREATEST(COALESCE(S.seed_std_age, 0), 0.5 * POP.pop_std_age), 2))
+      * GREATEST(ABS(S.seed_mean_age - POP.pop_mean_age) / NULLIF(POP.pop_std_age, 0), 0.1)
+    -- + ... repeat for ALL other numeric features (other RFM windows, demographics, interests)
+      AS NUMERIC_SIMILARITY_SCORE,
+
+    -- Categorical scores: seed_share × pre-computed scalar importance
+    -- CRITICAL: Reference IMP_ CTEs — do NOT use correlated subqueries here
+    COALESCE(SG.seed_share, 0) * (SELECT importance FROM IMP_GENDER)
+    + COALESCE(SS.seed_share, 0) * (SELECT importance FROM IMP_STATE)
+    + COALESCE(SP.seed_share, 0) * (SELECT importance FROM IMP_POLITICS)
+    + COALESCE(SI.seed_share, 0) * (SELECT importance FROM IMP_INCOME)
+    + COALESCE(SE.seed_share, 0) * (SELECT importance FROM IMP_EDUCATION)
+    + COALESCE(SEN.seed_share, 0) * (SELECT importance FROM IMP_ETHNICITY)
+    -- + ... repeat for ALL other categorical fields
+      AS CATEGORICAL_SIMILARITY_SCORE
+
+  FROM POP_FEATURES P
+  CROSS JOIN SEED_NUMERIC_STATS S
+  CROSS JOIN POP_NUMERIC_STATS POP
+  LEFT JOIN SEED_CAT_GENDER SG ON P.GENDER = SG.cat_value
+  LEFT JOIN SEED_CAT_STATE SS ON P.STATE = SS.cat_value
+  LEFT JOIN SEED_CAT_POLITICS SP ON P.POLITICS = SP.cat_value
+  LEFT JOIN SEED_CAT_INCOME SI ON P.INCOME_BUCKET = SI.cat_value
+  LEFT JOIN SEED_CAT_EDUCATION SE ON P.EDUCATION_LEVEL = SE.cat_value
+  LEFT JOIN SEED_CAT_ETHNICITY SEN ON P.ETHNICITY = SEN.cat_value
+  -- ... LEFT JOIN for each categorical seed distribution CTE
+)
+
+-- Phase 3: Rank and extract — sum the two scores ONCE, never duplicate expressions
+SELECT
+  AKKIO_ID,
+  IS_SEED,
+  NUMERIC_SIMILARITY_SCORE,
+  CATEGORICAL_SIMILARITY_SCORE,
+  (NUMERIC_SIMILARITY_SCORE + CATEGORICAL_SIMILARITY_SCORE) AS SIMILARITY_SCORE
+FROM SCORED
+ORDER BY SIMILARITY_SCORE DESC
+LIMIT <audience_size>;
+```
+
+**Key design points:**
+- **Pre-materialized RFM via `RFM_FEATURES`:** The scoring query reads pre-computed features — no transaction-level aggregation at scoring time. This eliminates the biggest performance bottleneck (full transaction table scan + GROUP BY).
+- **Single CTE chain:** The entire query is one `CREATE TABLE AS WITH ... SELECT ...` statement. No temp tables are created. Since `RFM_FEATURES` eliminates the heavy scan, a CTE chain executes efficiently.
+- **Pre-computed categorical importance:** Each `IMP_*` CTE computes the scalar importance once. The scoring SELECT references these scalars instead of re-evaluating correlated subqueries per row.
+- **No expression duplication:** `NUMERIC_SIMILARITY_SCORE` and `CATEGORICAL_SIMILARITY_SCORE` are computed once in the `SCORED` CTE, then summed in the final SELECT. Never repeat the full scoring expression in multiple columns.
+- **Gaussian similarity** (`EXP(-0.5 * z²)`) produces a smooth 0-to-1 score per feature. A prospect matching the seed mean exactly scores 1.0; distant values taper toward 0.
+- **Bandwidth floor** (`GREATEST(COALESCE(seed_std, 0), 0.5 * pop_std)`) prevents collapse for small/homogeneous seeds.
+- **Importance floor** (`GREATEST(importance, 0.1)`) ensures every feature contributes even when seed ≈ population.
+- **Automatic feature weighting** via `importance = |seed_mean - pop_mean| / pop_stddev` — no manual weight tuning.
+- **All features contribute** — RFM (across all 5 windows), demographics, interests, propensities. The weighting mechanism ensures discriminative features matter most.
+- **Seed members are NOT excluded from scoring.** They naturally score high because they match the seed profile.
+
+### Seed Member Handling
+
+**Seed members are included in the scored population and are NOT force-excluded.** They will naturally rank near the top because they match the seed profile. This mirrors how propensity models work:
+
+- A propensity model scores everyone; known buyers score well organically
+- Force-excluding seed creates an artificial gap and can bias the LAL toward lower-quality prospects
+- Force-including seed (as a union) inflates validation metrics without reflecting LAL quality
+
+When validating, you can always segment results by seed vs. non-seed members to measure incremental LAL lift separately. But the delivered audience should contain seed members naturally ranked by score — not force-included or force-excluded.
+
+### Precision vs. Reach Tuning
+
+Audience size (`<audience_size>`) directly controls the precision/reach trade-off:
+
+| Goal | Audience Size | Expected Outcome |
+|------|--------------|-------------------|
+| **High Precision** | Small (e.g., top 50K–100K) | Highest-scoring prospects only; strong similarity to seed, highest expected conversion |
+| **Balanced** | Medium (e.g., top 250K–500K) | Good similarity with broader reach; moderate conversion |
+| **High Reach** | Large (e.g., top 1M+) | Wider net; scores taper, conversion approaches baseline at the margin |
+
+The score distribution itself is informative: a steep drop-off means the seed is highly distinctive and a tight audience is appropriate. A gradual decline means the seed blends with the population and larger audiences are needed to capture meaningful volume.
+
+### Handling NULL Values in Scoring
+
+Many demographic and interest fields contain NULLs. Handle them consistently:
+
+- **Numeric NULLs:** Use `COALESCE(score_feature, 0)` — a NULL value contributes zero to the composite score (neither helps nor hurts).
+- **Categorical NULLs:** The `LEFT JOIN` to seed distribution CTEs will produce NULL for unmatched values; `COALESCE(..., 0)` handles this.
+- **Do NOT impute** missing values with population means — this would bias NULLs toward average scores. Let them contribute zero and let other features determine the prospect's rank.
+
+### Small Seed Safeguards
+
+Niche brands (political donations, sports betting, luxury goods, etc.) often produce very small seeds — sometimes fewer than 10 people. The scoring methodology MUST handle this gracefully:
+
+#### Bandwidth Floor (CRITICAL — always apply)
+**ALWAYS** use `GREATEST(COALESCE(seed_std, 0), 0.5 * pop_std)` as the Gaussian bandwidth denominator, NEVER use raw `NULLIF(seed_std, 0)`. Without the floor:
+- **Seed size = 1:** `STDDEV()` returns NULL → `NULLIF(NULL, 0)` = NULL → division by NULL → entire score = NULL → COALESCE → 0. Every numeric feature scores 0 for every prospect.
+- **Seed size = 2–10 with similar values:** `STDDEV()` is near-zero → Gaussian becomes a needle-thin spike → only exact clones of the seed score above 0. Effectively produces an empty audience.
+- **Seed size = 0 (no matches):** All seed statistics are NULL → no meaningful scoring is possible. **Always emit a diagnostic warning if the seed count is 0.**
+
+#### Importance Floor (CRITICAL — always apply)
+**ALWAYS** use `GREATEST(importance, 0.1)` as the feature weight, NEVER use raw importance. Without the floor:
+- **Very large / common seeds** (e.g., "all holiday shoppers"): Seed profile ≈ population profile → importance ≈ 0 on all features → all scores ≈ 0 → audience is meaningless.
+- The floor of 0.1 ensures the Gaussian still differentiates prospects by proximity to the seed mean, even when the seed isn't strongly distinctive.
+
+#### Seed Count Diagnostic
+**ALWAYS** include a `SEED_COUNT` CTE or output the seed count as a diagnostic. If the seed is empty (0 members), the query should return an informative message rather than a misleading all-zero audience.
+
+```sql
+SEED_COUNT AS (
+  SELECT COUNT(*) AS N_SEED FROM SEED_SHOPPERS
+)
+-- Reference this in the final output or add:
+-- WHERE (SELECT N_SEED FROM SEED_COUNT) > 0
+```
+
+### Anti-Patterns to Avoid
+
+**Scoring Anti-Patterns:**
+
+1. **Do NOT use binary pass/fail thresholds** on individual features — the scoring approach replaces hard thresholds with continuous weighted similarity. Never filter with `WHERE feature >= threshold`; instead, let every feature contribute to the composite score.
+2. **Do NOT hard-code feature weights** (e.g., "RFM gets 70%, demographics get 30%") — always derive weights from seed-vs-population comparison. The data determines what matters for each specific seed.
+3. **Do NOT force-include seed members** by unioning them into the audience. They should earn their place through scoring. Force-inclusion inflates validation metrics without reflecting actual LAL quality.
+4. **Do NOT force-exclude seed members** from the scored population. Excluding them biases the LAL and prevents natural pass-through. Instead, include a `IS_SEED` flag in the output for downstream analysis.
+5. **Do NOT limit scoring to a single feature family** (e.g., RFM-only). All available features — RFM, demographics, interests, propensities — must contribute. The automatic weighting ensures non-discriminative features contribute near the importance floor (0.1).
+6. **Do NOT pre-select features by vertical or brand type.** The feature importance calculation automatically surfaces which dimensions matter for each seed. Political brands will naturally weight political interests and online ratio; retail brands will naturally weight channel and spend.
+7. **Do NOT ignore the channel dimension** — online ratio should always be included as a scored feature, not just a binary filter.
+8. **Do NOT ignore NULLs** — handle them explicitly with COALESCE to prevent NULL propagation in the composite score.
+9. **Do NOT use raw `NULLIF(seed_std, 0)` as the Gaussian bandwidth.** Always wrap it with the bandwidth floor: `GREATEST(COALESCE(seed_std, 0), 0.5 * pop_std)`. Using raw NULLIF causes complete scoring failure for small/niche seeds.
+10. **Do NOT use raw importance without a floor.** Always use `GREATEST(importance, 0.1)`. Raw importance produces all-zero audiences when the seed resembles the general population.
+
+**Performance Anti-Patterns (CRITICAL):**
+
+11. **Do NOT compute RFM features inline from `FACT_TRANSACTION_ENRICHED`** in a lookalike or audience scoring query. Always use the pre-materialized `RFM_FEATURES` table. Inline RFM computation scans billions of rows and is the #1 cause of query timeouts.
+12. **Do NOT omit a date lower bound** when scanning `FACT_TRANSACTION_ENRICHED` (for seed identification or any other purpose). Always include `AND TRANS_DATE >= DATEADD(MONTH, -12, ref_date)` in addition to the upper bound. Without the lower bound, the query scans the entire transaction history.
+13. **Do NOT duplicate score expressions.** Compute `NUMERIC_SIMILARITY_SCORE` and `CATEGORICAL_SIMILARITY_SCORE` once each in a CTE, then sum them for `SIMILARITY_SCORE`. Never repeat the full scoring expression in multiple SELECT columns.
+14. **Do NOT use correlated subqueries for categorical importance** inside the per-row SELECT. Pre-compute each categorical importance as a scalar CTE (`IMP_GENDER`, `IMP_STATE`, etc.) and reference the scalar. Correlated subqueries re-evaluate for every row.
+15. **Do NOT create temporary tables** for lookalike queries. Since `RFM_FEATURES` is pre-materialized, a single `CREATE TABLE AS WITH ... SELECT ...` CTE chain is efficient and clean. Temp tables add unnecessary complexity.
 
 ---
 

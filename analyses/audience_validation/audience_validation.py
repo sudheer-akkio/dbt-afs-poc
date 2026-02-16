@@ -99,7 +99,7 @@ def load_audiences(config_path: Path = CONFIG_PATH) -> list[AudienceConfig]:
     return audiences
 
 
-# SQL Template
+# SQL Template — now includes a general-population baseline for lift calculation
 VALIDATION_SQL_TEMPLATE = """
 WITH AUDIENCE AS (
   SELECT AKKIO_ID
@@ -134,6 +134,24 @@ BRAND_METRICS AS (
   WHERE F.TRANS_DATE >= %(date_start)s
     AND F.TRANS_DATE <  %(date_end)s
     AND (__BRAND_FILTER__)
+),
+-- Baseline: general-population metrics over the same holdout window
+-- Counts ALL active transactors and brand shoppers in the full universe
+BASELINE_ACTIVE AS (
+  SELECT COUNT(DISTINCT F.AKKIO_ID) AS BASELINE_ACTIVE_IDS
+  FROM __FACT_DB__.__FACT_SCHEMA__.FACT_TRANSACTION_ENRICHED AS F
+  WHERE F.TRANS_DATE >= %(date_start)s
+    AND F.TRANS_DATE <  %(date_end)s
+),
+BASELINE_BRAND AS (
+  SELECT
+    COUNT(DISTINCT F.AKKIO_ID)           AS BASELINE_BRAND_SHOPPERS,
+    COUNT(F.TXID)                        AS BASELINE_BRAND_TRANSACTIONS,
+    COALESCE(SUM(F.TRANS_AMOUNT), 0)     AS BASELINE_BRAND_SPEND
+  FROM __FACT_DB__.__FACT_SCHEMA__.FACT_TRANSACTION_ENRICHED AS F
+  WHERE F.TRANS_DATE >= %(date_start)s
+    AND F.TRANS_DATE <  %(date_end)s
+    AND (__BRAND_FILTER__)
 )
 SELECT
   %(audience_name)s              AS AUDIENCE_NAME,
@@ -143,6 +161,8 @@ SELECT
   B.BRAND_SHOPPERS,
   B.BRAND_TRANSACTIONS,
   B.BRAND_SPEND,
+
+  -- Audience rates
   CASE WHEN A.ACTIVE_MATCHED_IDS > 0
        THEN CAST(B.BRAND_SHOPPERS AS FLOAT) / A.ACTIVE_MATCHED_IDS
        ELSE 0 END               AS SHOP_RATE,
@@ -154,10 +174,33 @@ SELECT
        ELSE 0 END               AS AVERAGE_TICKET,
   CASE WHEN B.BRAND_SHOPPERS > 0
        THEN CAST(B.BRAND_TRANSACTIONS AS FLOAT) / B.BRAND_SHOPPERS
-       ELSE 0 END               AS AVG_TRANSACTIONS_PER_SHOPPER
-FROM TOTAL_LAL   AS T
-CROSS JOIN ACTIVE_MATCHED AS A
-CROSS JOIN BRAND_METRICS  AS B;
+       ELSE 0 END               AS AVG_TRANSACTIONS_PER_SHOPPER,
+
+  -- Baseline rates (general population)
+  BA.BASELINE_ACTIVE_IDS,
+  BB.BASELINE_BRAND_SHOPPERS,
+  CASE WHEN BA.BASELINE_ACTIVE_IDS > 0
+       THEN CAST(BB.BASELINE_BRAND_SHOPPERS AS FLOAT) / BA.BASELINE_ACTIVE_IDS
+       ELSE 0 END               AS BASELINE_SHOP_RATE,
+  CASE WHEN BA.BASELINE_ACTIVE_IDS > 0
+       THEN CAST(BB.BASELINE_BRAND_SPEND AS FLOAT) / BA.BASELINE_ACTIVE_IDS
+       ELSE 0 END               AS BASELINE_SPEND_RATE,
+
+  -- Lift metrics (audience rate / baseline rate)
+  CASE WHEN BA.BASELINE_ACTIVE_IDS > 0 AND BB.BASELINE_BRAND_SHOPPERS > 0
+       THEN (CAST(B.BRAND_SHOPPERS AS FLOAT) / A.ACTIVE_MATCHED_IDS)
+          / (CAST(BB.BASELINE_BRAND_SHOPPERS AS FLOAT) / BA.BASELINE_ACTIVE_IDS)
+       ELSE NULL END            AS SHOP_RATE_LIFT,
+  CASE WHEN BA.BASELINE_ACTIVE_IDS > 0 AND BB.BASELINE_BRAND_SPEND > 0
+       THEN (CAST(B.BRAND_SPEND AS FLOAT) / A.ACTIVE_MATCHED_IDS)
+          / (CAST(BB.BASELINE_BRAND_SPEND AS FLOAT) / BA.BASELINE_ACTIVE_IDS)
+       ELSE NULL END            AS SPEND_RATE_LIFT
+
+FROM TOTAL_LAL         AS T
+CROSS JOIN ACTIVE_MATCHED   AS A
+CROSS JOIN BRAND_METRICS    AS B
+CROSS JOIN BASELINE_ACTIVE  AS BA
+CROSS JOIN BASELINE_BRAND   AS BB;
 """
 
 
@@ -301,9 +344,13 @@ def validate_all(audiences: list[AudienceConfig]) -> pd.DataFrame:
 
 
 # Display / export helpers
-CURRENCY_COLS = {"BRAND_SPEND", "SPEND_RATE", "AVERAGE_TICKET"}
-PERCENT_COLS = {"SHOP_RATE"}
-INT_COLS = {"TOTAL_LAL_IDS", "ACTIVE_MATCHED_IDS", "BRAND_SHOPPERS", "BRAND_TRANSACTIONS"}
+CURRENCY_COLS = {"BRAND_SPEND", "SPEND_RATE", "AVERAGE_TICKET", "BASELINE_SPEND_RATE"}
+PERCENT_COLS = {"SHOP_RATE", "BASELINE_SHOP_RATE"}
+INT_COLS = {
+    "TOTAL_LAL_IDS", "ACTIVE_MATCHED_IDS", "BRAND_SHOPPERS",
+    "BRAND_TRANSACTIONS", "BASELINE_ACTIVE_IDS", "BASELINE_BRAND_SHOPPERS",
+}
+LIFT_COLS = {"SHOP_RATE_LIFT", "SPEND_RATE_LIFT"}
 
 
 def _fmt(val, col: str) -> str:
@@ -315,42 +362,62 @@ def _fmt(val, col: str) -> str:
     if col in CURRENCY_COLS:
         return f"${val:,.2f}"
     if col in PERCENT_COLS:
-        return f"{val:.2%}"
+        return f"{val:.4%}"
+    if col in LIFT_COLS:
+        return f"{val:,.2f}x"
     if isinstance(val, float):
         return f"{val:,.2f}"
     return str(val)
 
 
 def print_summary(df: pd.DataFrame) -> None:
-    """Pretty-print the validation results table."""
+    """Pretty-print the validation results in two panels: audience metrics + baseline/lift."""
     if df.empty:
         print("\n(no results)\n")
         return
 
-    # Determine columns to display (skip AUDIENCE_ID for readability)
-    display_cols = [c for c in df.columns if c != "AUDIENCE_ID"]
+    # Panel 1: Core audience metrics
+    core_cols = [
+        "AUDIENCE_NAME", "TOTAL_LAL_IDS", "ACTIVE_MATCHED_IDS",
+        "BRAND_SHOPPERS", "BRAND_TRANSACTIONS", "BRAND_SPEND",
+        "SHOP_RATE", "SPEND_RATE", "AVERAGE_TICKET", "AVG_TRANSACTIONS_PER_SHOPPER",
+    ]
+    core_cols = [c for c in core_cols if c in df.columns]
 
-    # Build formatted rows
-    header = [c.replace("_", " ") for c in display_cols]
-    rows = []
-    for _, row in df.iterrows():
-        rows.append([_fmt(row[c], c) for c in display_cols])
+    # Panel 2: Baseline and lift
+    lift_cols = [
+        "AUDIENCE_NAME",
+        "BASELINE_ACTIVE_IDS", "BASELINE_BRAND_SHOPPERS",
+        "BASELINE_SHOP_RATE", "BASELINE_SPEND_RATE",
+        "SHOP_RATE_LIFT", "SPEND_RATE_LIFT",
+    ]
+    lift_cols = [c for c in lift_cols if c in df.columns]
 
-    # Calculate column widths
-    widths = [max(len(h), *(len(r[i]) for r in rows)) for i, h in enumerate(header)]
-    sep = "+-" + "-+-".join("-" * w for w in widths) + "-+"
-    hdr_line = "| " + " | ".join(h.rjust(w) for h, w in zip(header, widths)) + " |"
+    def _print_table(title: str, cols: list[str]) -> None:
+        header = [c.replace("_", " ") for c in cols]
+        rows = []
+        for _, row in df.iterrows():
+            rows.append([_fmt(row[c], c) for c in cols])
 
-    print("\n" + "=" * len(sep))
-    print("  AUDIENCE VALIDATION RESULTS")
-    print("=" * len(sep))
-    print(sep)
-    print(hdr_line)
-    print(sep)
-    for r in rows:
-        print("| " + " | ".join(v.rjust(w) for v, w in zip(r, widths)) + " |")
-    print(sep)
-    print()
+        widths = [max(len(h), *(len(r[i]) for r in rows)) for i, h in enumerate(header)]
+        sep = "+-" + "-+-".join("-" * w for w in widths) + "-+"
+        hdr_line = "| " + " | ".join(h.rjust(w) for h, w in zip(header, widths)) + " |"
+
+        print("\n" + "=" * len(sep))
+        print(f"  {title}")
+        print("=" * len(sep))
+        print(sep)
+        print(hdr_line)
+        print(sep)
+        for r in rows:
+            print("| " + " | ".join(v.rjust(w) for v, w in zip(r, widths)) + " |")
+        print(sep)
+        print()
+
+    _print_table("AUDIENCE METRICS", core_cols)
+
+    if lift_cols and len(lift_cols) > 1:
+        _print_table("BASELINE COMPARISON & LIFT", lift_cols)
 
 
 def export_csv(df: pd.DataFrame, output_dir: Path) -> Path:

@@ -421,6 +421,93 @@ models:
       - name: EXPERIMENT_GROUP
         description: "Experiment group assignment: CONTROL, EXPOSED, or NULL if not in experiment | :upper"
   
+  - name: rfm_features
+    description: >
+      Pre-materialized RFM (Recency, Frequency, Monetary) features per individual.
+      Mirrors the Affinity Solutions data mart feature set with 5 time windows
+      (12mo, 9mo, 6mo, 3mo, 1mo). Use this table for lookalike audience scoring
+      and audience profiling instead of scanning FACT_TRANSACTION_ENRICHED directly.
+      Source: fact_transaction_enriched
+      Grain: One row per AKKIO_ID
+      Reference date: Defaults to MAX(TRANS_DATE). Override with dbt var rfm_ref_date
+      (e.g., dbt run -s rfm_features --vars '{"rfm_ref_date": "2025-08-31"}') for
+      holdout validation builds. Check rfm_ref_date column to see which cutoff was used.
+      | :short-name:rfm_features: :use_for_audience_gen:yes: |
+    columns:
+      - name: AKKIO_ID
+        description: "Unique identifier for an individual (Primary Key)"
+        data_tests:
+          - unique
+          - not_null
+      - name: rfm_ref_date
+        description: "Reference date used for this RFM build. Defaults to MAX(TRANS_DATE); overridable via dbt var rfm_ref_date. Check this value to confirm the cutoff used for the current table."
+      - name: last_txn_date
+        description: "Most recent transaction date for this individual"
+      - name: days_since_last_txn
+        description: "Days between last transaction and reference date (recency)"
+      - name: tot_trans_12mo
+        description: "Total transaction count in 12-month window"
+      - name: tot_spend_12mo
+        description: "Total spend amount in 12-month window"
+      - name: tot_online_trans_12mo
+        description: "Online transaction count in 12-month window"
+      - name: tot_online_spend_12mo
+        description: "Online spend amount in 12-month window"
+      - name: avg_days_btwn_trans_12mo
+        description: "Average days between transactions in 12-month window (cadence)"
+      - name: brand_diversity_12mo
+        description: "Count of distinct brands transacted with in 12-month window"
+      - name: online_ratio_12mo
+        description: "Online transaction ratio (online_trans / total_trans) in 12-month window"
+      - name: tot_trans_9mo
+        description: "Total transaction count in 9-month window"
+      - name: tot_spend_9mo
+        description: "Total spend amount in 9-month window"
+      - name: tot_online_trans_9mo
+        description: "Online transaction count in 9-month window"
+      - name: tot_online_spend_9mo
+        description: "Online spend amount in 9-month window"
+      - name: avg_days_btwn_trans_9mo
+        description: "Average days between transactions in 9-month window"
+      - name: brand_diversity_9mo
+        description: "Count of distinct brands transacted with in 9-month window"
+      - name: tot_trans_6mo
+        description: "Total transaction count in 6-month window"
+      - name: tot_spend_6mo
+        description: "Total spend amount in 6-month window"
+      - name: tot_online_trans_6mo
+        description: "Online transaction count in 6-month window"
+      - name: tot_online_spend_6mo
+        description: "Online spend amount in 6-month window"
+      - name: avg_days_btwn_trans_6mo
+        description: "Average days between transactions in 6-month window"
+      - name: brand_diversity_6mo
+        description: "Count of distinct brands transacted with in 6-month window"
+      - name: tot_trans_3mo
+        description: "Total transaction count in 3-month window"
+      - name: tot_spend_3mo
+        description: "Total spend amount in 3-month window"
+      - name: tot_online_trans_3mo
+        description: "Online transaction count in 3-month window"
+      - name: tot_online_spend_3mo
+        description: "Online spend amount in 3-month window"
+      - name: avg_days_btwn_trans_3mo
+        description: "Average days between transactions in 3-month window"
+      - name: brand_diversity_3mo
+        description: "Count of distinct brands transacted with in 3-month window"
+      - name: tot_trans_1mo
+        description: "Total transaction count in 1-month window"
+      - name: tot_spend_1mo
+        description: "Total spend amount in 1-month window"
+      - name: tot_online_trans_1mo
+        description: "Online transaction count in 1-month window"
+      - name: tot_online_spend_1mo
+        description: "Online spend amount in 1-month window"
+      - name: avg_days_btwn_trans_1mo
+        description: "Average days between transactions in 1-month window"
+      - name: brand_diversity_1mo
+        description: "Count of distinct brands transacted with in 1-month window"
+
   - name: fact_transaction_summary
     description: >
       Transaction activity aggregated per given day.

@@ -31,42 +31,78 @@ defaults:
 # -- Audiences to validate ----------------------------------------------------
 audiences:
 
-  - audience_id: "akkio_audience_a64a3518_0b98_428d_bd52_62193f77927b"
-    name: "ActBlue Exposed Likely Prospects"
-    brand_keywords:
-      - "ACTBLUE"
-
-  - audience_id: "akkio_audience_4213278e_2935_4131_a114_df8976f47fbb"
-    name: "ActBlue Control Likely Prospects Lookalike"
-    brand_keywords:
-      - "ACTBLUE"
-    
-  - audience_id: "akkio_audience_cf577ee6_08db_4294_9716_bbf06b7c389b"
-    name: "ActBlue Shoppers Exposed"
-    brand_keywords:
-      - "ACTBLUE"
-
-  - audience_id: "akkio_audience_9588a38d_8d82_4c7a_87b5_05299c694f6d"
-    name: "ActBlue Shoppers Exposed Lookalike"
+  - audience_id: "akkio_audience_fa2c035a_fb96_49d1_8bbb_fec924dd4123"
+    name: "ActBlue Contributors Profile Lookalike - w/ seed"
     brand_keywords:
       - "ACTBLUE"
   
-  - audience_id: "akkio_audience_ab2b535c_3a4b_4a41_94b0_df0564f7a4c7"
-    name: "Ross Likely Buyers"
+  - audience_id: "akkio_audience_e5597113_9756_4807_a1c8_25ccd8ff53bb"
+    name: "ActBlue Contributors Profile Lookalike - no seed"
     brand_keywords:
-      - "ROSS"
+      - "ACTBLUE"
 
-  - audience_id: "akkio_audience_b5ecc926_f421_4be2_acdf_e672c6d77c7a"
-    name: "Ross Likely Buyers Lookalike"
-    brand_keywords:
-      - "ROSS"
+  # - audience_id: "akkio_audience_4213278e_2935_4131_a114_df8976f47fbb"
+  #   name: "ActBlue Control Likely Prospects Lookalike"
+  #   brand_keywords:
+  #     - "ACTBLUE"
+    
+  # - audience_id: "akkio_audience_cf577ee6_08db_4294_9716_bbf06b7c389b"
+  #   name: "ActBlue Shoppers Exposed"
+  #   brand_keywords:
+  #     - "ACTBLUE"
 
-  - audience_id: "akkio_audience_62341a69_d801_487f_817b_a6a224f64f5b"
-    name: "Ross Shoppers Exposed Non-Holiday"
-    brand_keywords:
-      - "ROSS"
+  # - audience_id: "akkio_audience_37467e33_7049_4a30_88aa_01ba4584bd92" #"akkio_audience_9588a38d_8d82_4c7a_87b5_05299c694f6d"
+  #   name: "ActBlue Shoppers Exposed Lookalike"
+  #   brand_keywords:
+  #     - "ACTBLUE"
 
-  - audience_id: "akkio_audience_1b2a8c56_c952_465b_a41e_1220e97a982e"
-    name: "Ross Shoppers Exposed Non-Holiday Lookalike"
-    brand_keywords:
-      - "ROSS"
+  # - audience_id: "akkio_audience_b1b65571_46b9_44df_a85a_d841f20a0bfc"
+  #   name: "ActBlue High Precision Lookalike Audience"
+  #   brand_keywords:
+  #     - "ACTBLUE"
+  
+  # - audience_id: "akkio_audience_ab2b535c_3a4b_4a41_94b0_df0564f7a4c7"
+  #   name: "Ross Likely Buyers"
+  #   brand_keywords:
+  #     - "ROSS"
+
+  # - audience_id: "akkio_audience_b5ecc926_f421_4be2_acdf_e672c6d77c7a"
+  #   name: "Ross Likely Buyers Lookalike"
+  #   brand_keywords:
+  #     - "ROSS"
+
+  # - audience_id: "akkio_audience_62341a69_d801_487f_817b_a6a224f64f5b"
+  #   name: "Ross Shoppers Exposed Non-Holiday"
+  #   brand_keywords:
+  #     - "ROSS"
+
+  # - audience_id: "akkio_audience_1b2a8c56_c952_465b_a41e_1220e97a982e"
+  #   name: "Ross Shoppers Exposed Non-Holiday Lookalike"
+  #   brand_keywords:
+  #     - "ROSS"
+
+  # - audience_id: "akkio_audience_3a6239e3_9a75_464e_b521_5798c6d298ff"
+  #   name: "Ross Shoppers LAL New D-SQL"
+  #   brand_keywords:
+  #     - "ROSS"
+
+  # - audience_id: "akkio_audience_8735576c_2160_49d1_84dd_766710e76881"
+  #   name: "Ross Shoppers LAL New Akkio ML"
+  #   brand_keywords:
+  #     - "ROSS"
+  
+
+  # - audience_id: "akkio_audience_5c3a61ce_1bdf_4e52_92d8_77410bcd17d9"
+  #   name: "BetMGM Shoppers Profile Lookalike - Akkio LAL with Seed"
+  #   brand_keywords:
+  #     - "BetMGM"
+  
+  # - audience_id: "akkio_audience_70289c8b_04fa_4187_b360_19a8a4073102"
+  #   name: "BetMGM Shoppers Profile - only SEED"
+  #   brand_keywords:
+  #     - "BetMGM"
+  
+  # - audience_id: "akkio_audience_636969e5_bde3_4059_b0ee_2c1169aea795"
+  #   name: "BetMGM Shoppers Profile Lookalike - no SEED"
+  #   brand_keywords:
+  #     - "BetMGM"
