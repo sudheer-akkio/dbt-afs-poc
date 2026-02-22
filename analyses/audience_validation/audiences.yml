@@ -36,8 +36,18 @@ audiences:
     brand_keywords:
       - "ACTBLUE"
   
+  - audience_id: "akkio_audience_bf86aa9d_f6e0_4f29_9713_d0dc1bfd0236"
+    name: "ActBlue Contributor Seed Lookalike 20M - Final"
+    brand_keywords:
+      - "ACTBLUE"
+  
   - audience_id: "akkio_audience_e5cf0fc2_ced4_4360_a985_07228a302804"
     name: "ActBlue Deterministic Lookalike Audience - Final"
+    brand_keywords:
+      - "ACTBLUE"
+  
+  - audience_id: "akkio_audience_9a7f13ad_9289_4eb2_88e0_9eb530ddbcc6"
+    name: "ActBlue Deterministic Lookalike Audience 20M - Final"
     brand_keywords:
       - "ACTBLUE"
 
@@ -45,9 +55,19 @@ audiences:
     name: "Ross Seed Audience Lookalike - Final"
     brand_keywords:
       - "ROSS"
+  
+  - audience_id: "akkio_audience_3d43b5fe_b34c_4e14_929c_27c39df58e70"
+    name: "Ross Seed Audience Lookalike 30M - Final"
+    brand_keywords:
+      - "ROSS"
 
   - audience_id: "akkio_audience_bee8d300_5bce_4c5a_baa4_8f279073a6a1"
     name: "Ross Deterministic Lookalike Audience - Final"
+    brand_keywords:
+      - "ROSS"
+  
+  - audience_id: "akkio_audience_3f9b6f76_6d1a_42d2_bdde_097026db0900"
+    name: "Ross Deterministic Lookalike Audience 30M - Final"
     brand_keywords:
       - "ROSS"
 
@@ -55,14 +75,40 @@ audiences:
     name: "BetMGM Seed Lookalike - Final"
     brand_keywords:
       - "BetMGM"
+  
+  - audience_id: "akkio_audience_22714845_6145_4d04_a0a1_27aa3fec68c6"
+    name: "BetMGM Seed Lookalike 20M - Final"
+    brand_keywords:
+      - "BetMGM"
 
   - audience_id: "akkio_audience_629a1c20_731d_460d_a939_9f0926517974"
     name: "BetMGM Deterministic Lookalike Audience - Final"
     brand_keywords:
       - "BetMGM"
+    
+  - audience_id: "akkio_audience_5d9223fc_7eb7_4da4_be6c_1a97302b03fe"
+    name: "BetMGM Deterministic Lookalike Audience 20M - Final"
+    brand_keywords:
+      - "BetMGM"
   
   - audience_id: "akkio_audience_f7a57367_ca4c_4f39_b27b_439ba3ad543b"
     name: "Holiday Discount Department Store Shoppers Seed Lookalike - Final"
+    brand_keywords:
+      - "ROSS"
+      - "TJMAXX"
+      - "TJ-MAXX"
+      - "MARSHALLS"
+      - "BURLINGTON"
+      - "NORDSTROM-RACK"
+      - "TARGET"
+      - "WALMART"
+      - "KOHLS"
+      - "MACYS"
+      - "JC-PENNEY"
+      - "JCPENNEY"
+
+  - audience_id: "akkio_audience_5f340011_8e04_44b1_a76d_c8d17e0e42b4"
+    name: "Holiday Discount Department Store Shoppers Seed Lookalike 30M - Final"
     brand_keywords:
       - "ROSS"
       - "TJMAXX"
